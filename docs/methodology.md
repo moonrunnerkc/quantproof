@@ -13,11 +13,13 @@ Read these before citing a quantproof report.
   interval (transient compute buffers, fragmentation churn) can exceed
   the reported peak. Treat "peak VRAM" as a floor on the true peak,
   accurate to the polling interval, not an allocator trace.
-- **NVIDIA only.** Measurements come from nvidia-smi. On machines
-  without it (no GPU, AMD, Apple Silicon), runs still execute but every
-  VRAM figure is reported as "not measured", never estimated. Apple
-  Silicon's unified memory makes "fits in VRAM" a different question;
-  quantproof does not pretend to answer it yet.
+- **Memory measurement is nvidia-smi only, today.** On machines
+  without it (Apple Silicon, AMD, no GPU), runs still execute but every
+  memory figure is reported as "not measured", never estimated. Apple
+  Silicon's unified memory makes "fits" a different question and its
+  measurement is the current work, not a someday item; until it lands,
+  Mac reports carry measured quality and latency with memory marked
+  honestly as unmeasured.
 - **Ollama decides GPU offload, not quantproof.** A model that does not
   fully fit may silently run split across CPU and GPU. The report flags
   *suspected* partial offload with a stated reason when either signal

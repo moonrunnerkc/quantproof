@@ -50,8 +50,9 @@ QuantProof automates that process. It:
 
 ## Case study
 
-<!-- LAUNCH DATA GOES HERE: the RTX 5070 study (3 packs, 10+ quants),
-     table and recommendation verbatim from report --markdown. -->
+<!-- LAUNCH DATA GOES HERE: the Apple Silicon study (3 packs, quant
+     ladder, Ollama vs Rapid-MLX on an M5 Max), table and
+     recommendation verbatim from report --markdown. -->
 
 Results forthcoming. The report below is exactly what QuantProof prints,
 unedited.
@@ -62,10 +63,12 @@ Requirements:
 
 - Node.js 22+
 - For local model sweeps: [Ollama](https://ollama.com) running
-- An NVIDIA GPU with nvidia-smi available if you want VRAM measurements
+- Any machine works: macOS on Apple Silicon, Linux, or Windows
 
-Runs still work without an NVIDIA GPU. In that case, the VRAM columns are
-clearly marked "not measured."
+Memory measurement depends on the hardware: on NVIDIA GPUs the peak is
+polled via nvidia-smi; everywhere else the memory columns are clearly
+marked "not measured" (unified-memory measurement for Apple Silicon is
+in progress). Quality and latency are measured on every machine.
 
 ```sh
 git clone https://github.com/moonrunnerkc/quantproof && cd quantproof

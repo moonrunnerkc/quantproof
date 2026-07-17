@@ -7,7 +7,11 @@ file wins every disagreement. Log deviations in docs/decisions.md with a
 one-line reason.
 
 ## Environment
-- Ubuntu Linux, NVIDIA RTX 5070, nvidia-smi available
+- macOS on Apple Silicon (M5 Max, 64 GB unified memory), primary dev
+  and measurement machine. Linux/NVIDIA remains supported for users
+  (nvidia-smi path), but nothing is gated on NVIDIA hardware anymore.
+- Rapid-MLX (OpenAI-compatible, MLX) may be serving at
+  http://localhost:8000/v1; verify against the live instance.
 - Node 22, TypeScript strict
 - Ollama running at http://localhost:11434 with a small model pulled.
   Verify API behavior against the live instance; do not trust memory of
