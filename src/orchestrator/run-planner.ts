@@ -137,5 +137,10 @@ export function renderRunPlan(plan: RunPlan, packName: string): string {
   lines.push(
     `  estimate: ~${String(Math.round(totalSeconds / 60))} min total (${String(plan.estimatedSecondsPerCandidate)}s per candidate at a fixed pre-measurement guess; refined after the first model completes)`,
   );
+  if (totalSeconds > 3600) {
+    lines.push(
+      `  warning: that is over an hour of sequential inference. Candidates run strictly one at a time by design; consider --limit <n> for a quick first pass, or trim the candidate list, and remember an interrupted sweep continues with: quantproof resume`,
+    );
+  }
   return lines.join('\n');
 }

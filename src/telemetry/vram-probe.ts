@@ -48,7 +48,18 @@ export interface VramProbeOptions {
   readonly binary?: string;
   /** Sampling interval passed to -lms. */
   readonly intervalMs?: number;
+  /** Timeline cap override, for tests; default VRAM_TIMELINE_CAP. */
+  readonly timelineCap?: number;
 }
+
+/**
+ * Maximum retained timeline samples. When the cap is hit the timeline
+ * is decimated (every other sample dropped), halving its resolution;
+ * the peak is tracked on the raw stream and never loses precision. At
+ * 200 ms sampling the cap covers ~13 minutes at full resolution and a
+ * multi-hour candidate at coarser steps.
+ */
+export const VRAM_TIMELINE_CAP = 4096;
 
 /** A one-shot VRAM reading for plan-time and isolation checks. */
 export interface VramSnapshot {
@@ -139,7 +150,9 @@ export function startVramProbe(options: VramProbeOptions = {}): VramProbe {
     return { gpu: null, unavailableReason: reason, stop: () => Promise.resolve({ available: false, reason }) };
   }
 
-  const samples: VramSample[] = [];
+  const timelineCap = Math.max(2, options.timelineCap ?? VRAM_TIMELINE_CAP);
+  let samples: VramSample[] = [];
+  let peakMib = 0;
   let spawnFailure: string | null = null;
   let buffered = '';
   child.stdout.setEncoding('utf8');
@@ -150,7 +163,11 @@ export function startVramProbe(options: VramProbeOptions = {}): VramProbe {
     for (const line of lines) {
       const usedMib = Number.parseInt(line.trim(), 10);
       if (!Number.isNaN(usedMib)) {
+        peakMib = Math.max(peakMib, usedMib);
         samples.push({ at: performance.now(), usedMib });
+        if (samples.length >= timelineCap) {
+          samples = samples.filter((_, index) => index % 2 === 0);
+        }
       }
     }
   });
@@ -175,7 +192,7 @@ export function startVramProbe(options: VramProbeOptions = {}): VramProbe {
             resolvePromise({
               available: true,
               gpu,
-              peakMib: Math.max(...samples.map((s) => s.usedMib)),
+              peakMib,
               samples,
             });
           }

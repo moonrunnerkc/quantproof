@@ -73,6 +73,24 @@ while true; do echo "3120"; echo "9840"; echo "7413"; sleep 0.02; done`,
     }
   });
 
+  it('caps the timeline by decimation while the peak keeps full precision', async () => {
+    // 30 samples against a cap of 8: the timeline must stay bounded and
+    // the one-off spike must survive as the peak even if its sample is
+    // decimated out of the timeline.
+    const lines = Array.from({ length: 30 }, (_, i) => `echo "${String(i === 13 ? 9999 : 1000 + i)}"`).join('\n');
+    const binary = fakeSmi('flood-smi', `${INFO_BRANCH}\n${lines}\nsleep 60`);
+    const probe = startVramProbe({ binary, intervalMs: 20, timelineCap: 8 });
+    await new Promise((r) => setTimeout(r, 200));
+    const result = await probe.stop();
+    expect(result.available).toBe(true);
+    if (result.available) {
+      expect(result.samples.length).toBeLessThanOrEqual(8);
+      expect(result.peakMib).toBe(9999);
+      const times = result.samples.map((s) => s.at);
+      expect([...times].sort((a, b) => a - b)).toEqual(times);
+    }
+  });
+
   it('still returns collected samples when the sampler exits before stop', async () => {
     const binary = fakeSmi(
       'short-lived-smi',

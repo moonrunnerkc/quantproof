@@ -78,6 +78,19 @@ describe('renderRunPlan', () => {
     expect(text).toContain('skip huge:27b');
     expect(text).toContain('estimate: ~3 min total');
     expect(text).toContain('refined after the first model completes');
+    expect(text).not.toContain('over an hour');
+  });
+
+  it('warns up front when the estimate crosses an hour', () => {
+    // 100 units x (2048/20 + 2) + 30 = 10470s per candidate.
+    const plan = buildRunPlan(
+      [assessment(descriptor('small:1b', 1e9), 12227)],
+      { force: false, unitsPerCandidate: 100, maxTokens: 2048 },
+    );
+    const text = renderRunPlan(plan, 'big-sweep');
+    expect(text).toContain('over an hour of sequential inference');
+    expect(text).toContain('--limit');
+    expect(text).toContain('quantproof resume');
   });
 });
 
