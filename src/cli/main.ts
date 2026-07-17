@@ -6,6 +6,7 @@
  */
 
 import { Command } from 'commander';
+import { modelsCommand } from './command-models.js';
 import { reportCommand } from './command-report.js';
 import { resumeCommand } from './command-resume.js';
 import { runCommand } from './command-run.js';
@@ -70,6 +71,20 @@ program
   .action(async (options: { db: string }) => {
     try {
       await resumeCommand(options);
+    } catch (err) {
+      console.error(err instanceof Error ? err.message : String(err));
+      process.exitCode = 1;
+    }
+  });
+
+program
+  .command('models')
+  .description('List candidate models with sizes, quant tags, and fit predictions')
+  .option('--config <file>', 'run config file listing candidate models')
+  .option('--context <n>', 'context length for the fit prediction (default 4096)', (v) => Number.parseInt(v, 10))
+  .action(async (options: { config?: string; context?: number }) => {
+    try {
+      await modelsCommand(options);
     } catch (err) {
       console.error(err instanceof Error ? err.message : String(err));
       process.exitCode = 1;
