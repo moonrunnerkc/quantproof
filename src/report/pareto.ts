@@ -30,8 +30,15 @@ export interface ParetoResult {
   }[];
 }
 
-/** Why an aggregate cannot compete on the frontier, or null if it can. */
-function exclusionReason(aggregate: CandidateAggregate): string | null {
+/**
+ * Why an aggregate cannot compete on the frontier or be recommended:
+ * it OOMed, failed, never scored, or failed a gate scorer. Null when
+ * the candidate is a legitimate competitor.
+ *
+ * @param aggregate - The candidate's aggregate.
+ * @returns The reason, or null for an eligible candidate.
+ */
+export function ineligibilityReason(aggregate: CandidateAggregate): string | null {
   if (aggregate.status === 'oom') {
     return `did not run: ${aggregate.statusReason ?? 'out of memory'}`;
   }
@@ -85,7 +92,7 @@ export function paretoFrontier(aggregates: readonly CandidateAggregate[]): Paret
   const excluded: { aggregate: CandidateAggregate; reason: string }[] = [];
   const points: ParetoPoint[] = [];
   for (const aggregate of aggregates) {
-    const reason = exclusionReason(aggregate);
+    const reason = ineligibilityReason(aggregate);
     if (reason !== null || !isGatePassing(aggregate)) {
       excluded.push({ aggregate, reason: reason ?? 'not eligible' });
       continue;
