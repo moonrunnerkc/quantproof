@@ -62,6 +62,9 @@ function footnotesFor(aggregates: readonly CandidateAggregate[]): Map<CandidateA
         .join('; ');
       own.push({ marker: marker(), text: `${aggregate.candidate.modelName}: failed gate scorers (${gates}); gate failures zero the unit score and exclude the candidate from the frontier and the recommendation` });
     }
+    if (aggregate.summary.truncatedEmptyCount > 0) {
+      own.push({ marker: marker(), text: `${aggregate.candidate.modelName}: ${String(aggregate.summary.truncatedEmptyCount)} of ${String(aggregate.summary.completed)} completed units hit the max_tokens budget before emitting any visible output; those scores measure truncation, not task quality; raise generation.max_tokens in task.yaml` });
+    }
     if (aggregate.offloadSuspectReason !== null) {
       own.push({ marker: marker(), text: `${aggregate.candidate.modelName}: suspected CPU/GPU split, ${aggregate.offloadSuspectReason}` });
     }

@@ -86,6 +86,22 @@ describe('renderMarkdownReport', () => {
     expect(renderMarkdownReport(caseStudyData())).not.toMatch(/[\u2013\u2014]/);
   });
 
+  it('footnotes empty-output truncation with the count and the fix', () => {
+    const truncated = makeAggregate('thinker:e4b', {
+      quality: 0, passRate: 0,
+      summary: { truncatedEmptyCount: 6 },
+    });
+    const rendered = renderMarkdownReport({
+      run: runRecord(),
+      aggregates: [truncated],
+      pareto: paretoFrontier([truncated]),
+      recommendation: recommend([truncated]),
+      notes: [],
+    });
+    expect(rendered).toContain('thinker:e4b: 6 of 6 completed units hit the max_tokens budget before emitting any visible output');
+    expect(rendered).toContain('raise generation.max_tokens in task.yaml');
+  });
+
   it('links the methodology doc and prints the exact reproduction command', () => {
     const rendered = renderMarkdownReport(caseStudyData());
     expect(rendered).toContain('[docs/methodology.md](docs/methodology.md)');

@@ -89,6 +89,15 @@ export function renderTerminalReport(input: ReportInput): string {
   if (input.offloadSuspectReason !== null) {
     lines.push(renderRow('offload', `SUSPECTED CPU/GPU SPLIT: ${input.offloadSuspectReason}`));
   }
+  if (summary.truncatedEmptyCount > 0) {
+    lines.push(
+      renderRow(
+        'truncation',
+        `TRUNCATED BEFORE CONTENT: ${String(summary.truncatedEmptyCount)} of ${String(summary.completed)} units stopped at max_tokens ${String(run.generation.max_tokens)} ` +
+          'with no visible output; raise generation.max_tokens in task.yaml',
+      ),
+    );
+  }
   lines.push(renderRow('determinism', determinismLine(summary)));
   lines.push(
     renderRow(

@@ -16,6 +16,7 @@ const summary: RunSummary = {
   tokensPerSecondMedian: 42.7, tokensPerSecondSpread: { min: 40.1, max: 44.9 },
   wallMsTotal: 60000,
   outputsDeterministic: true,
+  truncatedEmptyCount: 0,
 };
 
 const base: ReportInput = {
@@ -115,6 +116,15 @@ describe('renderTerminalReport', () => {
       summary: { ...summary, outputsDeterministic: false },
     });
     expect(text).toContain('NONDETERMINISTIC');
+  });
+
+  it('renders empty-output truncation loudly with the budget and the fix', () => {
+    const text = renderTerminalReport({
+      ...base,
+      summary: { ...summary, truncatedEmptyCount: 60 },
+    });
+    expect(text).toContain('TRUNCATED BEFORE CONTENT: 60 of 60 units stopped at max_tokens 512');
+    expect(text).toContain('raise generation.max_tokens in task.yaml');
   });
 
   it('says plainly when nothing completed', () => {

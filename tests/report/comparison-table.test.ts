@@ -63,6 +63,17 @@ describe('renderComparison', () => {
     expect(text).toContain('offload? leaky: measured peak plateaued');
   });
 
+  it('flags candidates whose units truncated at the token budget with empty output', () => {
+    const text = renderComparison(
+      dataFor([
+        makeAggregate('thinker', { quality: 0, summary: { truncatedEmptyCount: 6 } }),
+      ]),
+    );
+    expect(text).toMatch(/thinker.*trunc!/);
+    expect(text).toContain('trunc! thinker: 6 of 6 completed units hit the max_tokens budget');
+    expect(text).toContain('raise generation.max_tokens in task.yaml');
+  });
+
   it('names the pareto frontier and the dominated candidates', () => {
     const text = renderComparison(
       dataFor([

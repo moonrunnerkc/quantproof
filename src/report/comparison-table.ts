@@ -38,6 +38,14 @@ function flagsFor(aggregate: CandidateAggregate): Flag[] {
       .join(', ');
     flags.push({ token: 'gates!', detail: `failed gate scorers: ${gates}` });
   }
+  if (aggregate.summary.truncatedEmptyCount > 0) {
+    flags.push({
+      token: 'trunc!',
+      detail:
+        `${String(aggregate.summary.truncatedEmptyCount)} of ${String(aggregate.summary.completed)} completed units hit the max_tokens budget before emitting any visible output, ` +
+        'so their scores measure truncation, not task quality; raise generation.max_tokens in task.yaml',
+    });
+  }
   if (aggregate.offloadSuspectReason !== null) {
     flags.push({ token: 'offload?', detail: aggregate.offloadSuspectReason });
   }
