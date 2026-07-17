@@ -54,7 +54,7 @@ describe('initCommand', () => {
     expect(placeholderProblems[1]).toContain('002-replace-me.json');
   });
 
-  it('validates cleanly once the placeholders are replaced with real examples', async () => {
+  it('validates cleanly once the placeholders are replaced with real examples', () => {
     const dir = join(root, 'invoices');
     for (const file of ['001-replace-me.json', '002-replace-me.json']) {
       writeFileSync(
