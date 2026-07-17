@@ -106,6 +106,13 @@ of each section.
 - Token spend per generation comes from the API's usage counts and every sweep prints the total at the end (also true for ollama runs, whose eval counts were already journaled).
 - e2e suites gate themselves: the ollama slice skips with a notice when no local Ollama answers, the API suite skips when ANTHROPIC_API_KEY is absent, so forks and keyless machines stay green.
 
+## Dress rehearsal (release gate)
+
+- Harness: no ANTHROPIC_API_KEY exists in this environment, so the rehearsal ran the documented commands verbatim with the SDK's ANTHROPIC_BASE_URL override pointed at a local API-shaped server and a dummy key. Every user-facing surface (README path, init, pack authoring, config format, interrupt/resume, reports, bundle) was exercised for real; live-API behavior is covered by the e2e workflow once the repo secret is set, which is the one post-session step.
+- Iteration 1 (stopped at the README): the only install path was npx against an unpublished npm package, and Ollama was stated as a hard requirement even for API runs. Fixed: from-source clone/build/link block, requirements split per backend.
+- Iteration 2 (full pass, five defects, all in API-run reporting): the methodology paragraph claimed forced unloads, cooldowns, nvidia-smi polling, and a fixed seed on an API run; quant rendered "?" where quantization is not a concept; the pareto bullet said not-measured instead of not-applicable; model-id digests truncated to 12 chars; the reproduce block omitted the key export an API rerun needs. All fixed; renderers now branch on the backend.
+- Iteration 3: full pass with zero fixes. Fresh clone to recommendation via README and docs only; SIGINT mid-sweep then resume completed 60 of 60 units exactly once (zero duplicate generations); bundle re-scored 60/60 to identical values; no key material in the journal db or bundle.
+
 ## Deferred
 
 - Word-number parsing ("forty-two") for numeric-tolerance.
