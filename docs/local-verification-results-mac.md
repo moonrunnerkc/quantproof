@@ -19,7 +19,9 @@ Execution of the macOS section of [local-verification.md](local-verification.md)
 - `npm run build` — tsc clean, no errors.
 - `npm test` — **399/399 passed** (32 files, 3.27s). Matches the
   documented count exactly.
-- `npm run test:e2e` — pending (below).
+- `npm run test:e2e` — **1/1 passed** (5.71s) against live Ollama with
+  gemma3:1b. Validates the blob-store default (`~/.ollama/models`) and
+  the full run pipeline on macOS.
 
 ## 2. Metal determinism
 
