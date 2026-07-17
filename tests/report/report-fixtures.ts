@@ -15,6 +15,7 @@ export interface UnitOptions {
   readonly tps?: number | null;
   readonly status?: 'completed' | 'failed' | 'pending' | 'skipped';
   readonly pass?: boolean;
+  readonly doneReason?: string;
   /** Sets details.failedGate, marking a gate failure on this unit. */
   readonly failedGate?: string;
 }
@@ -44,7 +45,7 @@ export function unitResult(
     failureReason: null,
     generation: {
       id: `g-${id}`, workUnitId: id, output: overrides.output ?? `out-${exampleId}`,
-      doneReason: 'stop', ttftMs: overrides.ttftMs ?? 100, tokensPerSecond: overrides.tps ?? 40,
+      doneReason: overrides.doneReason ?? 'stop', ttftMs: overrides.ttftMs ?? 100, tokensPerSecond: overrides.tps ?? 40,
       wallMs: 500, tokenCount: 10, promptTokenCount: 20, outputTokenCount: 10, requestOptions: {},
     },
     score: {
@@ -138,6 +139,7 @@ export function makeAggregate(modelName: string, opts: AggregateOptions = {}): C
     tokensPerSecondSpread: tps === null ? null : { min: tps - 2, max: tps + 2 },
     wallMsTotal: 3000,
     outputsDeterministic: quality === null ? null : true,
+    truncatedEmptyCount: 0,
     ...opts.summary,
   };
   return {

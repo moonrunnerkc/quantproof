@@ -53,6 +53,13 @@ export interface RunSummary {
    * the fixed seed. Null when no example completed more than once.
    */
   readonly outputsDeterministic: boolean | null;
+  /**
+   * Completed units whose generation stopped at the max_tokens budget
+   * (done reason "length") without emitting any visible output. Their
+   * zero scores measure truncation, not task quality: reasoning-style
+   * models can spend the whole budget on thinking tokens.
+   */
+  readonly truncatedEmptyCount: number;
 }
 
 /**
@@ -132,6 +139,9 @@ export function summarizeRun(results: readonly UnitResult[]): RunSummary {
     tokensPerSecondSpread: spreadOf(rates),
     wallMsTotal: done.reduce((sum, r) => sum + (r.generation?.wallMs ?? 0), 0),
     outputsDeterministic,
+    truncatedEmptyCount: done.filter(
+      (r) => r.generation?.doneReason === 'length' && (r.generation?.output ?? '').trim() === '',
+    ).length,
   };
 }
 

@@ -69,6 +69,20 @@ describe('summarizeRun', () => {
     expect(summarizeRun([unit('001', 1, 1)]).outputsDeterministic).toBeNull();
   });
 
+  it('counts units truncated at the token budget before any visible output', () => {
+    const summary = summarizeRun([
+      unit('001', 1, 0, { doneReason: 'length', output: '' }),
+      unit('002', 1, 0, { doneReason: 'length', output: '  \n' }),
+      unit('003', 1, 1, { doneReason: 'stop', output: 'label' }),
+    ]);
+    expect(summary.truncatedEmptyCount).toBe(2);
+  });
+
+  it('does not count truncation when the budget-limited output has content', () => {
+    const summary = summarizeRun([unit('001', 1, 0.5, { doneReason: 'length', output: 'partial' })]);
+    expect(summary.truncatedEmptyCount).toBe(0);
+  });
+
   it('produces nulls, not zeros, when nothing completed', () => {
     const summary = summarizeRun([unit('001', 1, 0, { status: 'pending' })]);
     expect(summary.meanScore).toBeNull();
