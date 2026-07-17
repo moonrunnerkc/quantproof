@@ -175,6 +175,27 @@ export class RunStore {
       );
   }
 
+  /** Reads all runs, newest first. */
+  listRuns(): RunRecord[] {
+    const rows = this.db
+      .prepare('SELECT * FROM runs ORDER BY created_at_ms DESC')
+      .all() as Record<string, unknown>[];
+    return rows.map((row) => ({
+      id: row['id'] as string,
+      createdAtMs: row['created_at_ms'] as number,
+      packName: row['pack_name'] as string,
+      packDir: row['pack_dir'] as string,
+      taskType: row['task_type'] as string,
+      scorerName: row['scorer_name'] as string,
+      generation: JSON.parse(row['generation_json'] as string) as RunRecord['generation'],
+      backendVersion: row['backend_version'] as string,
+      gpuName: row['gpu_name'] as string | null,
+      driverVersion: row['driver_version'] as string | null,
+      vramAvailable: row['vram_available'] === 1,
+      vramUnavailableReason: row['vram_unavailable_reason'] as string | null,
+    }));
+  }
+
   /**
    * Reads every work unit of a run joined with its generation and
    * score, pending units included; this is the crash-recovery view and

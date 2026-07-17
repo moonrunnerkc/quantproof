@@ -58,6 +58,17 @@ const score = (unitId: string): UnitScoreRecord => ({
 });
 
 describe('RunStore', () => {
+  it('lists runs newest first with generation params rehydrated', () => {
+    const store = RunStore.open(tempDb());
+    store.createRun(run);
+    store.createRun({ ...run, id: 'run-2', createdAtMs: run.createdAtMs + 1000 });
+    const runs = store.listRuns();
+    expect(runs.map((r) => r.id)).toEqual(['run-2', 'run-1']);
+    expect(runs[1]?.generation).toEqual(run.generation);
+    expect(runs[1]?.vramAvailable).toBe(false);
+    store.close();
+  });
+
   it('journals a completed unit and reads it back joined with generation and score', () => {
     const store = RunStore.open(tempDb());
     seedPlan(store);
