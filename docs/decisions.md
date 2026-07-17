@@ -113,6 +113,9 @@ of each section.
 - Iteration 2 (full pass, five defects, all in API-run reporting): the methodology paragraph claimed forced unloads, cooldowns, nvidia-smi polling, and a fixed seed on an API run; quant rendered "?" where quantization is not a concept; the pareto bullet said not-measured instead of not-applicable; model-id digests truncated to 12 chars; the reproduce block omitted the key export an API rerun needs. All fixed; renderers now branch on the backend.
 - Iteration 3: full pass with zero fixes. Fresh clone to recommendation via README and docs only; SIGINT mid-sweep then resume completed 60 of 60 units exactly once (zero duplicate generations); bundle re-scored 60/60 to identical values; no key material in the journal db or bundle.
 
+- Pre-release log audit: history-wide secret scan found only the intentional test canaries; a message rewrite stripped four attribution trailers left by early tooling, replaced em dashes in two subjects, and shortened three subjects past 65 chars. Content and authorship untouched (zero-line tree diff). Older commits keep their conventional-commit prefixes: rewriting substance-bearing subjects wholesale risks misdescribing the work, and prefixes are an ordinary human convention.
+- Default branch renamed master to main at release, matching the convention the CI workflow and docs reference.
+
 ## Deferred
 
 - Word-number parsing ("forty-two") for numeric-tolerance.
