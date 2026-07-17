@@ -6,6 +6,7 @@
  */
 
 import { Command } from 'commander';
+import { reportCommand } from './command-report.js';
 import { resumeCommand } from './command-resume.js';
 import { runCommand } from './command-run.js';
 import { registerBuiltinScorers } from '../scoring/builtin-scorers.js';
@@ -69,6 +70,24 @@ program
   .action(async (options: { db: string }) => {
     try {
       await resumeCommand(options);
+    } catch (err) {
+      console.error(err instanceof Error ? err.message : String(err));
+      process.exitCode = 1;
+    }
+  });
+
+program
+  .command('report')
+  .description('Render a stored run as a comparison table, a markdown report, or a reproducibility bundle')
+  .argument('[run-id]', 'run id (a unique prefix works); the newest run when omitted')
+  .option('--db <path>', 'results database path', '.quantproof/results.db')
+  .option('--markdown', 'write the shareable markdown report to a file')
+  .option('--bundle', 'export the reproducibility bundle (report, raw outputs, scores, metadata)')
+  .option('--out <path>', 'output file path for --markdown or --bundle')
+  .option('--tolerance <fraction>', 'quality tolerance for the recommendation, e.g. 0.02', (v) => Number.parseFloat(v))
+  .action((runId: string | undefined, options: { db: string; markdown?: boolean; bundle?: boolean; out?: string; tolerance?: number }) => {
+    try {
+      reportCommand({ ...options, ...(runId === undefined ? {} : { runId }) });
     } catch (err) {
       console.error(err instanceof Error ? err.message : String(err));
       process.exitCode = 1;
