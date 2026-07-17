@@ -50,6 +50,35 @@ export interface VramProbeOptions {
   readonly intervalMs?: number;
 }
 
+/** A one-shot VRAM reading for plan-time and isolation checks. */
+export interface VramSnapshot {
+  readonly freeMib: number;
+  readonly usedMib: number;
+}
+
+/**
+ * Samples free and used GPU memory once.
+ *
+ * @param binary - nvidia-smi or a test fake.
+ * @returns The snapshot, or null when the binary is missing or its
+ *   output is unparseable. Never throws.
+ */
+export function queryVramOnce(binary = 'nvidia-smi'): VramSnapshot | null {
+  const probe = spawnSync(binary, ['--query-gpu=memory.free,memory.used', '--format=csv,noheader,nounits'], {
+    encoding: 'utf8',
+    timeout: 5000,
+  });
+  if (probe.error !== undefined || probe.status !== 0) {
+    return null;
+  }
+  const parts = (probe.stdout.trim().split('\n')[0] ?? '').split(',').map((p) => Number.parseInt(p.trim(), 10));
+  const [freeMib, usedMib] = parts;
+  if (parts.length < 2 || freeMib === undefined || usedMib === undefined || Number.isNaN(freeMib) || Number.isNaN(usedMib)) {
+    return null;
+  }
+  return { freeMib, usedMib };
+}
+
 /** Queries GPU identity once. Returns null when the binary is unusable. */
 function queryGpuInfo(binary: string): GpuInfo | null {
   const probe = spawnSync(binary, ['--query-gpu=name,driver_version,memory.total', '--format=csv,noheader,nounits'], {
