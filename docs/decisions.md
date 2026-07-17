@@ -42,6 +42,25 @@ of each section.
 - eslint-plugin-import-x and typescript-eslint project service require config files listed in tsconfig include and the default-export exemption; vitest.e2e.config.ts added to both.
 - First live result worth keeping: gemma3:1b scores 0.000 on invoice-extraction not because extraction fails (field-f1 would give 1.0 after normalization) but because it quotes totals as strings and the json-schema gate rejects "/total must be number". The gate composition surfaces exactly this distinction in details.
 
+## Phase 2 (sweep, fit, resume)
+
+- Run config format kept to two keys (candidates, use_local_models), documented in docs/run-config.md; unknown keys are hard errors so typos cannot silently change a sweep.
+- BackendAdapter interface extended with listModels(), and ModelDescriptor with a remote flag: the resolver needs the local store, and Ollama cloud entries must be excluded from sweeps because nothing about them is measurable locally.
+- Architecture metadata comes from /api/show model_info first; the in-repo GGUF header reader (documented format, versions 2 and 3, arrays skipped structurally) is the fallback and was verified against real multi-gigabyte blobs. The blob locator searches $OLLAMA_MODELS, ~/.ollama/models, then /usr/share/ollama/.ollama/models (the systemd service default, which is where this machine's store actually lives).
+- KV cache estimate: blocks x kv_heads x (key_length + value_length) x context x 2 bytes (f16). Fixed compute allowance 1024 MiB. Conservative bias: fits requires predicted peak within 95% of sampled free VRAM.
+- With no GPU telemetry, fit verdicts are "unknown" and unknown candidates run (measurement decides); only a confident does-not-fit is filtered without --force. An explicitly named --model always runs: naming it is the override.
+- OOM classifier patterns include Ollama 0.23.1's generic load failure ("model failed to load ... resource limitations"), verified live by loading a 17 GB model on this 15 GB machine; it is deliberately a *suspect* classification. A mid-stream backend crash also classifies as OOM-suspect per build plan section 6.
+- Unit statuses gained "skipped": an OOM candidate's remaining units are journaled as skipped with the reason, so resume can honor "never re-attempt OOM at the same configuration" from the journal alone.
+- Resume drift detection fingerprints the whole pack directory (every file, sorted walk) and the config file bytes; any change aborts resume with an explanation instead of mixing configurations.
+- Isolation between candidates: forced unload (in the candidate runner's finally), VRAM polled back to within 256 MiB of the pre-load baseline or a 15s timeout with a loud warning, then a 3s cooldown. On this GPU-less machine the baseline poll is a no-op by design.
+- Partial-offload heuristic: measured peak under 60% of predicted while completing, or median tok/s under 25% of the best similar-size candidate (0.5x to 2x weights). It writes a reasoned flag, never a hard claim, and needs peers or a prediction to fire.
+- Time estimate: fixed 20 tok/s guess plus flat per-unit and per-candidate overheads, recomputed from the first completed candidate's measured median rate for the remaining candidates.
+- executeSingleModelRun was replaced by prepareSweepJournal + executeSweep (a single --model run is now a one-candidate sweep); pre-release interface change, all callers updated in the same commits.
+- Live sweep gate: 4 real candidates (gemma3-27b-q4 16.4 GiB, qwen3:14b, qwen3:4b, gemma3:1b) over ticket-classification. The 27b was induced to OOM (17 GiB weights on a 15 GiB RAM, GPU-less machine), classified oom-suspect at load, its 6 units journaled as skipped, and the sweep completed the other three candidates (18/18 units, all seed-deterministic, 25.2 / 10.4 / 4.1 tok/s). The offload heuristic correctly stayed quiet: no two candidates share a size band on this ladder.
+- Live kill/resume gate: SIGKILL mid-candidate left 2 of 24 units completed; resume picked up exactly the 16 pending units across 3 non-OOM candidates and re-ran nothing finished. A second unplanned kill (SIGPIPE from a truncated shell pipeline) mid-resume was also absorbed: final journal holds all 24 units exactly once, zero units with more than one generation.
+- Gate 4 (predicted vs measured VRAM within 15%) is unverifiable on this machine: predicted peaks are recorded for every candidate (18447 / 10190 / 3694 / 1854 MiB), but measured peak is null everywhere because there is no GPU and no nvidia-smi here; Ollama runs CPU-only (size_vram 0). The predicted-vs-measured delta rendering and the 15% check need one sweep on the 5070 host; nothing was waved off, there is simply no measurement to compare on this box.
+- Progress lines write through console.log; a downstream head/SIGPIPE kills the process mid-run, which the journal absorbs by design (it became an accidental extra crash test). Not treating EPIPE specially in v0.1.
+
 ## Deferred
 
 - Word-number parsing ("forty-two") for numeric-tolerance.
