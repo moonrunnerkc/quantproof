@@ -6,6 +6,7 @@
  */
 
 import { Command } from 'commander';
+import { initCommand } from './command-init.js';
 import { modelsCommand } from './command-models.js';
 import { reportCommand } from './command-report.js';
 import { resumeCommand } from './command-resume.js';
@@ -71,6 +72,23 @@ program
   .action(async (options: { db: string }) => {
     try {
       await resumeCommand(options);
+    } catch (err) {
+      console.error(err instanceof Error ? err.message : String(err));
+      process.exitCode = 1;
+    }
+  });
+
+program
+  .command('init')
+  .description('Scaffold a new task pack interactively')
+  .argument('[dir]', 'target directory; defaults to ./<task-name>')
+  .option('--name <name>', 'task pack name')
+  .option('--type <type>', 'task type, e.g. extraction or classification')
+  .option('--scorer <scorer>', 'primary scorer for the scaffold')
+  .option('--yes', 'accept every default without prompting')
+  .action(async (dir: string | undefined, options: { name?: string; type?: string; scorer?: string; yes?: boolean }) => {
+    try {
+      await initCommand({ ...options, ...(dir === undefined ? {} : { dir }) });
     } catch (err) {
       console.error(err instanceof Error ? err.message : String(err));
       process.exitCode = 1;

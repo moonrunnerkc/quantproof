@@ -78,6 +78,12 @@ export function loadExamples(dir: string): ExamplesLoad {
       continue;
     }
     const record = parsed as Record<string, unknown>;
+    if ('replace_me' in record) {
+      errors.push(
+        `${sourcePath}: placeholder example from quantproof init; replace "input" and "expected" with a real example of your task, then delete the "replace_me" key`,
+      );
+      continue;
+    }
     const fileErrors: string[] = [];
     if (typeof record['input'] !== 'string' || record['input'].trim() === '') {
       fileErrors.push(`${sourcePath}: "input" must be a non-empty string`);

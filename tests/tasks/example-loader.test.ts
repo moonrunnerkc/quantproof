@@ -116,4 +116,18 @@ describe('loadExamples', () => {
     const result = loadExamples(dir);
     expect(!result.ok && result.errors).toHaveLength(2);
   });
+
+  it('rejects an init placeholder even when its input and expected look valid', () => {
+    const dir = tempDir();
+    writeFileSync(
+      join(dir, '001-replace-me.json'),
+      JSON.stringify({ replace_me: 'delete me', input: 'looks fine', expected: 'also fine' }),
+    );
+    const result = loadExamples(dir);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.errors[0]).toContain('placeholder example from quantproof init');
+      expect(result.errors[0]).toContain('delete the "replace_me" key');
+    }
+  });
 });
