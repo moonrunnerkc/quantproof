@@ -105,6 +105,7 @@ export interface AggregateOptions {
   readonly gatesPassed?: boolean | null;
   readonly gateFailureCounts?: Readonly<Record<string, number>>;
   readonly sizeBytes?: number;
+  readonly parameterSize?: string;
   readonly predictedPeakMib?: number | null;
   readonly offloadSuspectReason?: string | null;
   readonly quantization?: string | null;
@@ -144,7 +145,7 @@ export function makeAggregate(modelName: string, opts: AggregateOptions = {}): C
       id: `cand-${modelName}`, runId: 'run-1', modelName,
       digest: `${modelName.replace(/[^a-z0-9]/gi, '')}0123456789abcdef`,
       quantization: opts.quantization === undefined ? 'Q4_K_M' : opts.quantization,
-      parameterSize: '1B',
+      parameterSize: opts.parameterSize ?? '1B',
       sizeBytes: opts.sizeBytes ?? 800_000_000,
       fitVerdict: 'fits', predictedPeakMib: predicted, fitDetails: {},
     },
