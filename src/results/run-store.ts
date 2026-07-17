@@ -11,13 +11,15 @@ import Database from 'better-sqlite3';
 import type {
   CandidateOutcome,
   CandidateRecord,
+  CandidateResult,
   GenerationRecord,
   RunRecord,
   UnitResult,
   UnitScoreRecord,
   WorkUnitRecord,
-  WorkUnitStatus,
 } from './record-types.js';
+import { candidateFromRow, runFromRow, unitResultFromRows } from './store-rows.js';
+import type { UnitRow } from './store-rows.js';
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS runs (
@@ -25,14 +27,17 @@ CREATE TABLE IF NOT EXISTS runs (
   pack_name TEXT NOT NULL, pack_dir TEXT NOT NULL, task_type TEXT NOT NULL,
   scorer_name TEXT NOT NULL, generation_json TEXT NOT NULL,
   backend_version TEXT NOT NULL, gpu_name TEXT, driver_version TEXT,
-  vram_available INTEGER NOT NULL, vram_unavailable_reason TEXT
+  vram_available INTEGER NOT NULL, vram_unavailable_reason TEXT,
+  plan_json TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS candidates (
   id TEXT PRIMARY KEY, run_id TEXT NOT NULL REFERENCES runs(id),
   model_name TEXT NOT NULL, digest TEXT NOT NULL,
   quantization TEXT, parameter_size TEXT, size_bytes INTEGER NOT NULL,
-  status TEXT NOT NULL DEFAULT 'running',
-  peak_vram_mib REAL, vram_samples_json TEXT, deterministic INTEGER
+  fit_verdict TEXT NOT NULL, predicted_peak_mib REAL, fit_details_json TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'running', status_reason TEXT,
+  peak_vram_mib REAL, vram_samples_json TEXT, deterministic INTEGER,
+  offload_suspect_reason TEXT
 );
 CREATE TABLE IF NOT EXISTS work_units (
   id TEXT PRIMARY KEY, run_id TEXT NOT NULL REFERENCES runs(id),
@@ -53,16 +58,6 @@ CREATE TABLE IF NOT EXISTS scores (
   details_json TEXT NOT NULL
 );
 `;
-
-interface UnitRow {
-  id: string;
-  run_id: string;
-  candidate_id: string;
-  example_id: string;
-  repetition: number;
-  status: WorkUnitStatus;
-  failure_reason: string | null;
-}
 
 /** Open handle on the results database. */
 export class RunStore {
@@ -93,13 +88,14 @@ export class RunStore {
     this.db
       .prepare(
         `INSERT INTO runs (id, created_at_ms, pack_name, pack_dir, task_type, scorer_name,
-         generation_json, backend_version, gpu_name, driver_version, vram_available, vram_unavailable_reason)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         generation_json, backend_version, gpu_name, driver_version, vram_available,
+         vram_unavailable_reason, plan_json)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         run.id, run.createdAtMs, run.packName, run.packDir, run.taskType, run.scorerName,
         JSON.stringify(run.generation), run.backendVersion, run.gpuName, run.driverVersion,
-        run.vramAvailable ? 1 : 0, run.vramUnavailableReason,
+        run.vramAvailable ? 1 : 0, run.vramUnavailableReason, JSON.stringify(run.plan),
       );
   }
 
@@ -107,12 +103,14 @@ export class RunStore {
   createCandidate(candidate: CandidateRecord): void {
     this.db
       .prepare(
-        `INSERT INTO candidates (id, run_id, model_name, digest, quantization, parameter_size, size_bytes)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO candidates (id, run_id, model_name, digest, quantization, parameter_size,
+         size_bytes, fit_verdict, predicted_peak_mib, fit_details_json)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         candidate.id, candidate.runId, candidate.modelName, candidate.digest,
         candidate.quantization, candidate.parameterSize, candidate.sizeBytes,
+        candidate.fitVerdict, candidate.predictedPeakMib, JSON.stringify(candidate.fitDetails),
       );
   }
 
@@ -163,16 +161,34 @@ export class RunStore {
       .run(reason, unitId);
   }
 
+  /**
+   * Marks every still-pending unit of a candidate skipped (an OOM
+   * candidate's remaining work), in one transaction.
+   */
+  skipPendingUnits(candidateId: string, reason: string): void {
+    this.db
+      .prepare("UPDATE work_units SET status = 'skipped', failure_reason = ? WHERE candidate_id = ? AND status = 'pending'")
+      .run(reason, candidateId);
+  }
+
   /** Writes a candidate's final measurements and status. */
   finishCandidate(candidateId: string, outcome: CandidateOutcome): void {
     this.db
       .prepare(
-        'UPDATE candidates SET status = ?, peak_vram_mib = ?, vram_samples_json = ?, deterministic = ? WHERE id = ?',
+        `UPDATE candidates SET status = ?, status_reason = ?, peak_vram_mib = ?,
+         vram_samples_json = ?, deterministic = ? WHERE id = ?`,
       )
       .run(
-        outcome.status, outcome.peakVramMib, JSON.stringify(outcome.vramSamples),
+        outcome.status, outcome.statusReason, outcome.peakVramMib, JSON.stringify(outcome.vramSamples),
         outcome.deterministic === null ? null : outcome.deterministic ? 1 : 0, candidateId,
       );
+  }
+
+  /** Records that the partial-offload heuristic fired for a candidate. */
+  flagOffloadSuspect(candidateId: string, reason: string): void {
+    this.db
+      .prepare('UPDATE candidates SET offload_suspect_reason = ? WHERE id = ?')
+      .run(reason, candidateId);
   }
 
   /** Reads all runs, newest first. */
@@ -180,20 +196,15 @@ export class RunStore {
     const rows = this.db
       .prepare('SELECT * FROM runs ORDER BY created_at_ms DESC')
       .all() as Record<string, unknown>[];
-    return rows.map((row) => ({
-      id: row['id'] as string,
-      createdAtMs: row['created_at_ms'] as number,
-      packName: row['pack_name'] as string,
-      packDir: row['pack_dir'] as string,
-      taskType: row['task_type'] as string,
-      scorerName: row['scorer_name'] as string,
-      generation: JSON.parse(row['generation_json'] as string) as RunRecord['generation'],
-      backendVersion: row['backend_version'] as string,
-      gpuName: row['gpu_name'] as string | null,
-      driverVersion: row['driver_version'] as string | null,
-      vramAvailable: row['vram_available'] === 1,
-      vramUnavailableReason: row['vram_unavailable_reason'] as string | null,
-    }));
+    return rows.map(runFromRow);
+  }
+
+  /** Reads a run's candidates in insertion order with their outcomes. */
+  listCandidates(runId: string): CandidateResult[] {
+    const rows = this.db
+      .prepare('SELECT * FROM candidates WHERE run_id = ? ORDER BY rowid')
+      .all(runId) as Record<string, unknown>[];
+    return rows.map(candidateFromRow);
   }
 
   /**
@@ -203,35 +214,17 @@ export class RunStore {
    */
   listUnitResults(runId: string): UnitResult[] {
     const units = this.db
-      .prepare('SELECT * FROM work_units WHERE run_id = ? ORDER BY example_id, repetition')
+      .prepare('SELECT * FROM work_units WHERE run_id = ? ORDER BY candidate_id, example_id, repetition')
       .all(runId) as UnitRow[];
     const generationFor = this.db.prepare('SELECT * FROM generations WHERE work_unit_id = ?');
     const scoreFor = this.db.prepare('SELECT * FROM scores WHERE work_unit_id = ?');
-    return units.map((row) => {
-      const gen = generationFor.get(row.id) as Record<string, unknown> | undefined;
-      const score = scoreFor.get(row.id) as Record<string, unknown> | undefined;
-      return {
-        unit: {
-          id: row.id, runId: row.run_id, candidateId: row.candidate_id,
-          exampleId: row.example_id, repetition: row.repetition,
-        },
-        status: row.status,
-        failureReason: row.failure_reason,
-        generation: gen === undefined ? null : {
-          id: gen['id'] as string, workUnitId: row.id, output: gen['output'] as string,
-          doneReason: gen['done_reason'] as string, ttftMs: gen['ttft_ms'] as number | null,
-          tokensPerSecond: gen['tokens_per_second'] as number | null, wallMs: gen['wall_ms'] as number,
-          tokenCount: gen['token_count'] as number, promptTokenCount: gen['prompt_token_count'] as number | null,
-          outputTokenCount: gen['output_token_count'] as number | null,
-          requestOptions: JSON.parse(gen['request_options_json'] as string) as Record<string, unknown>,
-        },
-        score: score === undefined ? null : {
-          id: score['id'] as string, workUnitId: row.id, scorerName: score['scorer_name'] as string,
-          score: score['score'] as number, pass: score['pass'] === 1,
-          details: JSON.parse(score['details_json'] as string) as Record<string, unknown>,
-        },
-      };
-    });
+    return units.map((row) =>
+      unitResultFromRows(
+        row,
+        generationFor.get(row.id) as Record<string, unknown> | undefined,
+        scoreFor.get(row.id) as Record<string, unknown> | undefined,
+      ),
+    );
   }
 
   /** Closes the underlying database handle. */

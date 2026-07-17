@@ -7,6 +7,25 @@
 
 import type { GenerationParams } from '../tasks/task-schema.js';
 
+/**
+ * What resume needs to rebuild a run exactly: how the run was invoked
+ * and fingerprints of everything that shaped the plan.
+ */
+export interface PlanSnapshot {
+  /** Explicit --model, or null for a resolved sweep. */
+  readonly explicitModel: string | null;
+  /** --config path, or null when defaults were used. */
+  readonly configPath: string | null;
+  /** sha256 of the config file content; null without a config file. */
+  readonly configFingerprint: string | null;
+  /** sha256 over the pack's files (manifest, prompt, schemas, examples). */
+  readonly packFingerprint: string;
+  /** --limit value, or null for all examples. */
+  readonly limit: number | null;
+  /** Whether --force bypassed fit filtering. */
+  readonly force: boolean;
+}
+
 /** One invocation of `quantproof run`. */
 export interface RunRecord {
   readonly id: string;
@@ -26,6 +45,8 @@ export interface RunRecord {
   /** False when the VRAM probe could not run; reason says why. */
   readonly vramAvailable: boolean;
   readonly vramUnavailableReason: string | null;
+  /** Invocation and fingerprints, for exact resume. */
+  readonly plan: PlanSnapshot;
 }
 
 /** One model/quant evaluated within a run. */
@@ -37,11 +58,22 @@ export interface CandidateRecord {
   readonly quantization: string | null;
   readonly parameterSize: string | null;
   readonly sizeBytes: number;
+  /** Fit verdict at plan time. */
+  readonly fitVerdict: 'fits' | 'does-not-fit' | 'unknown';
+  /** Predicted peak VRAM at plan time; null when unpredictable. */
+  readonly predictedPeakMib: number | null;
+  /** The arithmetic behind the verdict, for predicted-vs-measured. */
+  readonly fitDetails: Readonly<Record<string, unknown>>;
 }
+
+/** Candidate terminal states; oom is a result, not an error. */
+export type CandidateStatus = 'running' | 'completed' | 'failed' | 'oom';
 
 /** Final measurements for a candidate, written when it finishes. */
 export interface CandidateOutcome {
-  readonly status: 'completed' | 'failed';
+  readonly status: Exclude<CandidateStatus, 'running'>;
+  /** Why the candidate ended as it did; null for a clean completion. */
+  readonly statusReason: string | null;
   readonly peakVramMib: number | null;
   /** VRAM timeline as [offsetMs, usedMib] pairs; empty when unmeasured. */
   readonly vramSamples: readonly (readonly [number, number])[];
@@ -63,7 +95,18 @@ export interface WorkUnitRecord {
   readonly repetition: number;
 }
 
-export type WorkUnitStatus = 'pending' | 'completed' | 'failed';
+export type WorkUnitStatus = 'pending' | 'completed' | 'failed' | 'skipped';
+
+/** A candidate read back from the journal with its outcome so far. */
+export interface CandidateResult {
+  readonly record: CandidateRecord;
+  readonly status: CandidateStatus;
+  readonly statusReason: string | null;
+  readonly peakVramMib: number | null;
+  readonly deterministic: boolean | null;
+  /** Set when the partial-offload heuristic fired; the reasoning. */
+  readonly offloadSuspectReason: string | null;
+}
 
 /** The measured result of one generation, stored in full. */
 export interface GenerationRecord {

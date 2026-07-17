@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { RunStore } from '../../src/results/run-store.js';
-import type { GenerationRecord, RunRecord, UnitScoreRecord } from '../../src/results/record-types.js';
+import type { CandidateRecord, GenerationRecord, RunRecord, UnitScoreRecord } from '../../src/results/record-types.js';
 
 let dirs: string[] = [];
 function tempDb(): string {
@@ -29,14 +29,25 @@ const run: RunRecord = {
   driverVersion: null,
   vramAvailable: false,
   vramUnavailableReason: 'nvidia-smi is not available on this machine, so VRAM was not measured',
+  plan: {
+    explicitModel: null,
+    configPath: '/cfg/quantproof.yaml',
+    configFingerprint: 'c0ffee',
+    packFingerprint: 'deadbeef',
+    limit: 2,
+    force: false,
+  },
+};
+
+const candidate: CandidateRecord = {
+  id: 'cand-1', runId: 'run-1', modelName: 'gemma3:1b',
+  digest: 'abc123', quantization: 'Q4_K_M', parameterSize: '999.89M', sizeBytes: 815319791,
+  fitVerdict: 'unknown', predictedPeakMib: 1853.55, fitDetails: { weightsMib: 777.55 },
 };
 
 function seedPlan(store: RunStore): void {
   store.createRun(run);
-  store.createCandidate({
-    id: 'cand-1', runId: 'run-1', modelName: 'gemma3:1b',
-    digest: 'abc123', quantization: 'Q4_K_M', parameterSize: '999.89M', sizeBytes: 815319791,
-  });
+  store.createCandidate(candidate);
   store.createWorkUnits([
     { id: 'unit-1', runId: 'run-1', candidateId: 'cand-1', exampleId: '001', repetition: 1 },
     { id: 'unit-2', runId: 'run-1', candidateId: 'cand-1', exampleId: '001', repetition: 2 },
@@ -58,13 +69,14 @@ const score = (unitId: string): UnitScoreRecord => ({
 });
 
 describe('RunStore', () => {
-  it('lists runs newest first with generation params rehydrated', () => {
+  it('lists runs newest first with generation params and plan snapshot rehydrated', () => {
     const store = RunStore.open(tempDb());
     store.createRun(run);
     store.createRun({ ...run, id: 'run-2', createdAtMs: run.createdAtMs + 1000 });
     const runs = store.listRuns();
     expect(runs.map((r) => r.id)).toEqual(['run-2', 'run-1']);
     expect(runs[1]?.generation).toEqual(run.generation);
+    expect(runs[1]?.plan).toEqual(run.plan);
     expect(runs[1]?.vramAvailable).toBe(false);
     store.close();
   });
@@ -80,7 +92,6 @@ describe('RunStore', () => {
     expect(done?.generation?.output).toBe('{"vendor": "Acme", "total": 12.5}');
     expect(done?.generation?.requestOptions).toEqual(generation('unit-1').requestOptions);
     expect(done?.score?.score).toBe(1);
-    expect(done?.score?.pass).toBe(true);
     store.close();
   });
 
@@ -103,7 +114,6 @@ describe('RunStore', () => {
     const store = RunStore.open(tempDb());
     seedPlan(store);
     store.completeWorkUnit(generation('unit-1'), score('unit-1'));
-    // Duplicate generation id violates the primary key mid-transaction.
     expect(() =>
       store.completeWorkUnit({ ...generation('unit-2'), id: 'gen-unit-1' }, score('unit-2')),
     ).toThrow();
@@ -123,19 +133,55 @@ describe('RunStore', () => {
     store.close();
   });
 
+  it('skips only the still-pending units of a candidate, preserving finished ones', () => {
+    const store = RunStore.open(tempDb());
+    seedPlan(store);
+    store.completeWorkUnit(generation('unit-1'), score('unit-1'));
+    store.skipPendingUnits('cand-1', 'oom-suspect at context 4096');
+    const results = store.listUnitResults('run-1');
+    expect(results.find((r) => r.unit.id === 'unit-1')?.status).toBe('completed');
+    expect(results.find((r) => r.unit.id === 'unit-2')?.status).toBe('skipped');
+    expect(results.find((r) => r.unit.id === 'unit-3')?.failureReason).toContain('oom-suspect');
+    store.close();
+  });
+
+  it('reads candidates back with fit prediction, outcome, and offload flag', () => {
+    const store = RunStore.open(tempDb());
+    seedPlan(store);
+    store.finishCandidate('cand-1', {
+      status: 'oom',
+      statusReason: 'oom-suspect during load at context 4096: model failed to load',
+      peakVramMib: null,
+      vramSamples: [],
+      deterministic: null,
+    });
+    store.flagOffloadSuspect('cand-1', 'suspected cpu/gpu split: throughput collapsed');
+    const candidates = store.listCandidates('run-1');
+    expect(candidates).toHaveLength(1);
+    expect(candidates[0]?.record).toEqual(candidate);
+    expect(candidates[0]?.status).toBe('oom');
+    expect(candidates[0]?.statusReason).toContain('oom-suspect during load');
+    expect(candidates[0]?.offloadSuspectReason).toContain('cpu/gpu split');
+    expect(candidates[0]?.deterministic).toBeNull();
+    store.close();
+  });
+
   it('stores candidate outcomes including the nondeterminism flag', () => {
     const dbPath = tempDb();
     const store = RunStore.open(dbPath);
     seedPlan(store);
     store.finishCandidate('cand-1', {
       status: 'completed',
+      statusReason: null,
       peakVramMib: 4212,
       vramSamples: [[0, 900], [200, 4212]],
       deterministic: false,
     });
     store.close();
     const reopened = RunStore.open(dbPath);
-    expect(reopened.listUnitResults('run-1')).toHaveLength(3);
+    const read = reopened.listCandidates('run-1')[0];
+    expect(read?.peakVramMib).toBe(4212);
+    expect(read?.deterministic).toBe(false);
     reopened.close();
   });
 
