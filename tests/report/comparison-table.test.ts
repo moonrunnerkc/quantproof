@@ -97,6 +97,17 @@ describe('renderComparison', () => {
     expect(text).toMatch(/cpu-only.*n\/m/);
   });
 
+  it('marks an interrupted candidate and points at resume', () => {
+    const text = renderComparison(
+      dataFor([
+        makeAggregate('done', { quality: 0.9 }),
+        makeAggregate('cut-short', { quality: null, vram: null, tps: null, status: 'running' }),
+      ]),
+    );
+    expect(text).toMatch(/cut-short.*incomplete/);
+    expect(text).toContain('quantproof resume will complete its pending units');
+  });
+
   it('renders notes under the header', () => {
     const text = renderComparison(dataFor([makeAggregate('m')], ['re-scored from raw outputs; 2 of 18 scores changed']));
     expect(text).toContain('note: re-scored from raw outputs; 2 of 18 scores changed');

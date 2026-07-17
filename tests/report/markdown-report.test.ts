@@ -109,6 +109,13 @@ describe('renderMarkdownReport', () => {
     expect(rendered).toContain('| not measured |');
   });
 
+  it('footnotes an interrupted candidate and points at resume', () => {
+    const data = caseStudyData();
+    const interrupted = makeAggregate('half-done', { quality: null, vram: null, tps: null, status: 'running' });
+    const rendered = renderMarkdownReport({ ...data, aggregates: [...data.aggregates, interrupted] });
+    expect(rendered).toContain('half-done: interrupted before finishing; quantproof resume');
+  });
+
   it('renders re-score notes as a leading blockquote', () => {
     const data = { ...caseStudyData(), notes: ['re-scored from raw outputs with current scorers; 3 of 90 scores changed'] };
     expect(renderMarkdownReport(data)).toContain('> Note: re-scored from raw outputs');

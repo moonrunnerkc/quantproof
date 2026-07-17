@@ -42,6 +42,9 @@ export function ineligibilityReason(aggregate: CandidateAggregate): string | nul
   if (aggregate.status === 'oom') {
     return `did not run: ${aggregate.statusReason ?? 'out of memory'}`;
   }
+  if (aggregate.status === 'running') {
+    return 'interrupted before finishing; quantproof resume will complete its pending units';
+  }
   if (aggregate.status !== 'completed') {
     return `did not complete: ${aggregate.statusReason ?? 'no reason recorded'}`;
   }

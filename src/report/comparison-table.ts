@@ -25,6 +25,12 @@ function flagsFor(aggregate: CandidateAggregate): Flag[] {
   if (aggregate.status === 'failed') {
     flags.push({ token: 'failed', detail: aggregate.statusReason ?? 'no reason recorded' });
   }
+  if (aggregate.status === 'running') {
+    flags.push({
+      token: 'incomplete',
+      detail: 'interrupted before finishing; quantproof resume will complete its pending units',
+    });
+  }
   if (aggregate.gatesPassed === false) {
     const gates = Object.entries(aggregate.gateFailureCounts)
       .map(([gate, count]) => `${gate} (${String(count)} unit${count === 1 ? '' : 's'})`)

@@ -52,6 +52,9 @@ function footnotesFor(aggregates: readonly CandidateAggregate[]): Map<CandidateA
     if (aggregate.status === 'failed') {
       own.push({ marker: marker(), text: `${aggregate.candidate.modelName}: FAILED, ${aggregate.statusReason ?? 'no reason recorded'}` });
     }
+    if (aggregate.status === 'running') {
+      own.push({ marker: marker(), text: `${aggregate.candidate.modelName}: interrupted before finishing; quantproof resume will complete its pending units` });
+    }
     if (aggregate.gatesPassed === false) {
       const gates = Object.entries(aggregate.gateFailureCounts)
         .map(([gate, count]) => `${gate} on ${String(count)} of ${String(aggregate.summary.completed)} completed units`)
