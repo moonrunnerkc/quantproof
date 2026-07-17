@@ -33,18 +33,28 @@ export class FakeAdapter implements BackendAdapter {
     this.script = script;
   }
 
+  /** Models returned by listModels; tests may replace the contents. */
+  localModels: ModelDescriptor[] = [];
+
   version(): Promise<string> {
     return Promise.resolve('fake-backend 1.0');
   }
 
+  listModels(): Promise<readonly ModelDescriptor[]> {
+    return Promise.resolve(this.localModels);
+  }
+
   ensureModelAvailable(model: string): Promise<ModelDescriptor> {
-    return Promise.resolve({
-      name: model,
-      digest: 'f'.repeat(64),
-      sizeBytes: 1000,
-      quantization: 'Q4_K_M',
-      parameterSize: '1B',
-    });
+    return Promise.resolve(
+      this.localModels.find((m) => m.name === model) ?? {
+        name: model,
+        digest: 'f'.repeat(64),
+        sizeBytes: 1000,
+        quantization: 'Q4_K_M',
+        parameterSize: '1B',
+        remote: false,
+      },
+    );
   }
 
   load(model: string, context: number): Promise<void> {

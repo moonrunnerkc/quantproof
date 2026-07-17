@@ -16,7 +16,13 @@ import type {
   ModelDescriptor,
   TokenEvent,
 } from './backend-adapter.js';
-import { descriptorFromTags, parseErrorBody, parseGenerateLine, parsePullLine } from './ollama-parse.js';
+import {
+  allDescriptorsFromTags,
+  descriptorFromTags,
+  parseErrorBody,
+  parseGenerateLine,
+  parsePullLine,
+} from './ollama-parse.js';
 
 export const DEFAULT_OLLAMA_URL = 'http://localhost:11434';
 
@@ -79,6 +85,11 @@ export class OllamaAdapter implements BackendAdapter {
         ? String((body as Record<string, unknown>)['version'])
         : 'unknown';
     return `ollama ${version}`;
+  }
+
+  /** @inheritdoc */
+  async listModels(): Promise<readonly ModelDescriptor[]> {
+    return allDescriptorsFromTags(await this.requestJson('/api/tags'));
   }
 
   /** @inheritdoc */

@@ -31,6 +31,44 @@ export function parseErrorBody(body: string): string {
   return body.trim() === '' ? 'empty error response' : body.trim();
 }
 
+function descriptorFromEntry(entry: Record<string, unknown>): ModelDescriptor | null {
+  if (typeof entry['name'] !== 'string') {
+    return null;
+  }
+  const details = isRecord(entry['details']) ? entry['details'] : {};
+  return {
+    name: entry['name'],
+    digest: typeof entry['digest'] === 'string' ? entry['digest'] : '',
+    sizeBytes: typeof entry['size'] === 'number' ? entry['size'] : 0,
+    quantization:
+      typeof details['quantization_level'] === 'string' && details['quantization_level'] !== ''
+        ? details['quantization_level']
+        : null,
+    parameterSize:
+      typeof details['parameter_size'] === 'string' && details['parameter_size'] !== ''
+        ? details['parameter_size']
+        : null,
+    remote: typeof entry['remote_host'] === 'string' && entry['remote_host'] !== '',
+  };
+}
+
+/**
+ * Maps every entry of an /api/tags response to a descriptor, skipping
+ * malformed entries.
+ *
+ * @param tagsBody - Parsed /api/tags JSON.
+ * @returns All descriptors; empty for a malformed body.
+ */
+export function allDescriptorsFromTags(tagsBody: unknown): ModelDescriptor[] {
+  if (!isRecord(tagsBody) || !Array.isArray(tagsBody['models'])) {
+    return [];
+  }
+  return (tagsBody['models'] as unknown[])
+    .filter(isRecord)
+    .map(descriptorFromEntry)
+    .filter((d): d is ModelDescriptor => d !== null);
+}
+
 /**
  * Finds a model in an /api/tags response and maps it to a descriptor.
  *
@@ -40,32 +78,11 @@ export function parseErrorBody(body: string): string {
  * @returns The descriptor, or null when the model is not in the list.
  */
 export function descriptorFromTags(tagsBody: unknown, model: string): ModelDescriptor | null {
-  if (!isRecord(tagsBody) || !Array.isArray(tagsBody['models'])) {
-    return null;
-  }
-  for (const entry of tagsBody['models'] as unknown[]) {
-    if (!isRecord(entry) || typeof entry['name'] !== 'string') {
-      continue;
-    }
-    if (entry['name'] !== model && entry['name'] !== `${model}:latest`) {
-      continue;
-    }
-    const details = isRecord(entry['details']) ? entry['details'] : {};
-    return {
-      name: entry['name'],
-      digest: typeof entry['digest'] === 'string' ? entry['digest'] : '',
-      sizeBytes: typeof entry['size'] === 'number' ? entry['size'] : 0,
-      quantization:
-        typeof details['quantization_level'] === 'string' && details['quantization_level'] !== ''
-          ? details['quantization_level']
-          : null,
-      parameterSize:
-        typeof details['parameter_size'] === 'string' && details['parameter_size'] !== ''
-          ? details['parameter_size']
-          : null,
-    };
-  }
-  return null;
+  return (
+    allDescriptorsFromTags(tagsBody).find(
+      (d) => d.name === model || d.name === `${model}:latest`,
+    ) ?? null
+  );
 }
 
 /** One parsed line of a streaming /api/generate response. */

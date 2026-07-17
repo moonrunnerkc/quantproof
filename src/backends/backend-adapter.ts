@@ -18,6 +18,11 @@ export interface ModelDescriptor {
   readonly quantization: string | null;
   /** Parameter count as reported, e.g. "999.89M"; null when absent. */
   readonly parameterSize: string | null;
+  /**
+   * True for models served remotely (Ollama cloud entries). Remote
+   * models cannot be measured locally and are excluded from sweeps.
+   */
+  readonly remote: boolean;
 }
 
 /** Generation parameters, taken verbatim from the task manifest. */
@@ -74,6 +79,8 @@ export type GenerationStream = AsyncGenerator<TokenEvent, GenerationSummary, voi
 export interface BackendAdapter {
   /** Backend identity for the environment line, e.g. "ollama 0.23.1". */
   version(): Promise<string>;
+  /** Lists every model in the backend's local store. */
+  listModels(): Promise<readonly ModelDescriptor[]>;
   /**
    * Ensures the model is present locally, pulling it if the backend
    * supports that, and returns its descriptor. Throws when the model

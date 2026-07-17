@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
+  allDescriptorsFromTags,
   descriptorFromTags,
   parseErrorBody,
   parseGenerateLine,
@@ -60,7 +61,21 @@ describe('descriptorFromTags against a captured live tags response', () => {
       sizeBytes: 815319791,
       quantization: 'Q4_K_M',
       parameterSize: '999.89M',
+      remote: false,
     });
+  });
+
+  it('maps every entry and marks ollama cloud models as remote', () => {
+    const all = allDescriptorsFromTags(tags);
+    expect(all.length).toBeGreaterThanOrEqual(9);
+    const cloud = all.find((d) => d.name === 'kimi-k2.6:cloud');
+    expect(cloud?.remote).toBe(true);
+    const local = all.find((d) => d.name === 'qwen3:14b');
+    expect(local?.remote).toBe(false);
+  });
+
+  it('returns an empty list for a malformed tags body', () => {
+    expect(allDescriptorsFromTags({ nope: 1 })).toEqual([]);
   });
 
   it('maps empty quantization strings to null (cloud models report "")', () => {
