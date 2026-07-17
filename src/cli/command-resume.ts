@@ -16,6 +16,7 @@ import { checkExpectedValues } from '../scoring/plan-check.js';
 import { listScorers } from '../scoring/scorer-registry.js';
 import { loadTaskPack, TaskPackError } from '../tasks/task-loader.js';
 import { limitPack } from './command-run.js';
+import { withSweepGuards } from './sweep-guards.js';
 
 /** Options parsed from the command line. */
 export interface ResumeCommandOptions {
@@ -34,40 +35,43 @@ export interface ResumeCommandOptions {
  */
 export async function resumeCommand(options: ResumeCommandOptions): Promise<string> {
   registerBuiltinScorers();
-  const store = RunStore.open(options.db ?? '.quantproof/results.db');
-  try {
-    const run = findResumableRun(store);
-    if (run === null) {
-      const message = 'nothing to resume: every journaled run is complete';
-      console.log(message);
-      return message;
+  const dbPath = options.db ?? '.quantproof/results.db';
+  return withSweepGuards(dbPath, 'resume', async () => {
+    const store = RunStore.open(dbPath);
+    try {
+      const run = findResumableRun(store);
+      if (run === null) {
+        const message = 'nothing to resume: every journaled run is complete';
+        console.log(message);
+        return message;
+      }
+      verifyNoDrift(run);
+      const pack = limitPack(
+        loadTaskPack(run.packDir, listScorers()),
+        run.plan.limit ?? undefined,
+      );
+      const authoringProblems = checkExpectedValues(pack);
+      if (authoringProblems.length > 0) {
+        throw new TaskPackError(run.packDir, authoringProblems);
+      }
+      const prepared = buildResume(store, run);
+      console.log(
+        `resuming run ${run.id} (${run.packName}): ${String(prepared.entries.length)} candidate${prepared.entries.length === 1 ? '' : 's'} with ` +
+          `${String(prepared.entries.reduce((n, e) => n + e.units.length, 0))} pending units`,
+      );
+      const outcome = await executeSweep(pack, prepared, {
+        adapter: new OllamaAdapter(options.baseUrl),
+        store,
+        onProgress: (line) => {
+          console.log(`  ${line}`);
+        },
+      });
+      const data = buildReportData(run, store.listCandidates(run.id), store.listUnitResults(run.id));
+      const report = renderSweepReport(outcome) + renderComparison(data);
+      console.log(report);
+      return report;
+    } finally {
+      store.close();
     }
-    verifyNoDrift(run);
-    const pack = limitPack(
-      loadTaskPack(run.packDir, listScorers()),
-      run.plan.limit ?? undefined,
-    );
-    const authoringProblems = checkExpectedValues(pack);
-    if (authoringProblems.length > 0) {
-      throw new TaskPackError(run.packDir, authoringProblems);
-    }
-    const prepared = buildResume(store, run);
-    console.log(
-      `resuming run ${run.id} (${run.packName}): ${String(prepared.entries.length)} candidate${prepared.entries.length === 1 ? '' : 's'} with ` +
-        `${String(prepared.entries.reduce((n, e) => n + e.units.length, 0))} pending units`,
-    );
-    const outcome = await executeSweep(pack, prepared, {
-      adapter: new OllamaAdapter(options.baseUrl),
-      store,
-      onProgress: (line) => {
-        console.log(`  ${line}`);
-      },
-    });
-    const data = buildReportData(run, store.listCandidates(run.id), store.listUnitResults(run.id));
-    const report = renderSweepReport(outcome) + renderComparison(data);
-    console.log(report);
-    return report;
-  } finally {
-    store.close();
-  }
+  });
 }

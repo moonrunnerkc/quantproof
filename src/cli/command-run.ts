@@ -13,6 +13,7 @@ import { configFingerprint, packFingerprint } from '../orchestrator/recovery.js'
 import { renderComparison } from '../report/comparison-table.js';
 import { buildReportData } from '../report/report-data.js';
 import { renderSweepReport } from '../report/terminal-report.js';
+import { withSweepGuards } from './sweep-guards.js';
 import { RunStore } from '../results/run-store.js';
 import { registerBuiltinScorers } from '../scoring/builtin-scorers.js';
 import { checkExpectedValues } from '../scoring/plan-check.js';
@@ -97,41 +98,44 @@ export async function runCommand(options: RunCommandOptions): Promise<string> {
     throw new Error('every candidate was predicted not to fit; rerun with --force to attempt them anyway');
   }
 
-  const store = RunStore.open(options.db ?? '.quantproof/results.db');
-  try {
-    const prepared = prepareSweepJournal(
-      store, pack, options.pack, plan,
-      {
-        explicitModel: options.model ?? null,
-        configPath: options.config ?? null,
-        configFingerprint: configFingerprint(options.config ?? null),
-        packFingerprint: packFingerprint(options.pack),
-        limit: options.limit ?? null,
-        force,
-      },
-      {
-        backendVersion,
-        gpu,
-        vramUnavailableReason:
-          gpu === null ? 'nvidia-smi is not available on this machine, so VRAM was not measured' : null,
-      },
-    );
-    const outcome = await executeSweep(pack, prepared, {
-      adapter,
-      store,
-      onProgress: (line) => {
-        console.log(`  ${line}`);
-      },
-    });
-    const data = buildReportData(
-      outcome.run,
-      store.listCandidates(outcome.run.id),
-      store.listUnitResults(outcome.run.id),
-    );
-    const report = renderSweepReport(outcome) + renderComparison(data);
-    console.log(report);
-    return report;
-  } finally {
-    store.close();
-  }
+  const dbPath = options.db ?? '.quantproof/results.db';
+  return withSweepGuards(dbPath, `run --pack ${options.pack}`, async () => {
+    const store = RunStore.open(dbPath);
+    try {
+      const prepared = prepareSweepJournal(
+        store, pack, options.pack, plan,
+        {
+          explicitModel: options.model ?? null,
+          configPath: options.config ?? null,
+          configFingerprint: configFingerprint(options.config ?? null),
+          packFingerprint: packFingerprint(options.pack),
+          limit: options.limit ?? null,
+          force,
+        },
+        {
+          backendVersion,
+          gpu,
+          vramUnavailableReason:
+            gpu === null ? 'nvidia-smi is not available on this machine, so VRAM was not measured' : null,
+        },
+      );
+      const outcome = await executeSweep(pack, prepared, {
+        adapter,
+        store,
+        onProgress: (line) => {
+          console.log(`  ${line}`);
+        },
+      });
+      const data = buildReportData(
+        outcome.run,
+        store.listCandidates(outcome.run.id),
+        store.listUnitResults(outcome.run.id),
+      );
+      const report = renderSweepReport(outcome) + renderComparison(data);
+      console.log(report);
+      return report;
+    } finally {
+      store.close();
+    }
+  });
 }
