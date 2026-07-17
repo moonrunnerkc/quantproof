@@ -94,6 +94,18 @@ of each section.
 - VRAM timelines decimate at 4096 samples (halving resolution each time the cap is hit) while the peak tracks the raw stream, so no spike is ever lost to downsampling; documented in methodology.
 - Test honesty pass found no vi.mock and no was-called-only assertions anywhere; the two spy usages silence console output or assert prompting behavior. One defect fixed: a zip test named for an independent-implementation check it did not perform now actually shells out to python3 zipfile.
 
+## Anthropic API backend
+
+- Design intent: this backend exists for GPU-free validation and CI (the e2e suite runs on it), and later becomes the frontier-baseline comparison feature (local quants versus a Claude model on the same pack). It is the one feature addition of the release-hardening pass.
+- Built on @anthropic-ai/sdk rather than raw HTTP, deviating from the build plan's "no LLM SDKs" line: the SDK's default retry policy is byte-for-byte the required design (429 backoff honoring retry-after, transient 5xx twice, invalid requests never), and typed errors plus streaming helpers beat hand-rolled SSE for a supply-chain cost of one first-party dependency.
+- Backend selection lives in the run config (backend: ollama | anthropic); a stored run carries it in backendVersion, which is how resume reconnects to the same backend and how renderers label API runs. The anthropic backend demands an explicit candidates list; use_local_models is rejected there because sweeping the whole API catalog by default would be an expensive surprise.
+- API model descriptors carry sizeBytes 0 and the model id as digest: no local weights exist, and the id is the version pin the API exposes. sizeBytes 0 doubles as the no-local-footprint marker the recommendation checks.
+- Recommendation on API runs ranks gate-passing candidates on quality, then throughput, and says so in the reason; fit renders not-applicable (a fourth verdict, distinct from unknown), VRAM cells render n/a, and API runs skip GPU identity, VRAM probing, and inter-candidate cooldowns entirely (polling the local GPU during an API run would measure the wrong machine).
+- Seed and context sizing have no Messages API equivalent and are recorded as not-applicable in each generation's request options; a model that rejects temperature gets exactly one retry without it, recorded the same way. Determinism is still checked byte-for-byte across repetitions and flagged with backend-neutral wording.
+- Key hygiene: ANTHROPIC_API_KEY only, read at client construction, never placed in records; tests assert the journal database and exported bundles contain no key material, and the missing-key error carries the exact export command.
+- Token spend per generation comes from the API's usage counts and every sweep prints the total at the end (also true for ollama runs, whose eval counts were already journaled).
+- e2e suites gate themselves: the ollama slice skips with a notice when no local Ollama answers, the API suite skips when ANTHROPIC_API_KEY is absent, so forks and keyless machines stay green.
+
 ## Deferred
 
 - Word-number parsing ("forty-two") for numeric-tolerance.

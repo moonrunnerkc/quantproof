@@ -97,6 +97,40 @@ Read these before citing a quantproof report.
    quality. Raw outputs are retained, so reports re-score past runs
    with current scorers and say so when values changed.
 
+## The Anthropic API backend
+
+`backend: anthropic` in a run config sweeps Claude models over the
+streaming Messages API instead of local Ollama models. It exists so
+quality and latency can be validated with no GPU at all (and it is the
+CI path), and it doubles as a frontier baseline to compare local quants
+against. What changes, exactly:
+
+- **Measured:** quality (same deterministic scorers, same gates), time
+  to first token, tokens/sec from the stream, wall time, and token
+  spend per generation from the API's own usage counts (a sweep prints
+  the total at the end).
+- **Not measured, by construction:** VRAM, fit, and model files.
+  Inference runs on Anthropic hardware; every report labels these
+  not-applicable and the results are never comparable to a
+  local-model table.
+- **TTFT includes the public internet.** Latency numbers describe your
+  connection to the API at that moment, not the model in isolation.
+- **No sampler seed exists.** Seed and context sizing from the pack are
+  recorded as not-applicable rather than silently dropped. Repetitions
+  still run and outputs are still compared byte for byte; if they
+  differ, the run is flagged nondeterministic exactly like a local
+  backend that stopped honoring its seed. Models that reject the
+  temperature parameter get one retry without it, and the request
+  record says so.
+- **Recommendation semantics change.** With no local footprint, the
+  recommendation ranks gate-passing candidates on quality first, then
+  throughput, and the report states that explicitly.
+- **Retries:** rate limits back off honoring retry-after, transient
+  server errors retry twice, invalid requests never retry.
+- **The key never enters artifacts.** ANTHROPIC_API_KEY is read from
+  the environment, used for authentication, and appears in no journal,
+  report, bundle, or log; the test suite asserts this.
+
 ## Reproducing someone else's numbers
 
 `quantproof report --bundle` exports a zip with the report, every raw

@@ -6,14 +6,41 @@ already in the local Ollama store.
 
 ```yaml
 # quantproof.yaml
+backend: ollama      # or "anthropic"; default ollama
 candidates:          # evaluated first, pulled on demand if missing
   - gemma3:1b
   - qwen3:4b
-use_local_models: true   # also sweep everything already pulled (default true)
+use_local_models: true   # ollama only: also sweep everything already pulled (default true)
 ```
 
 That is the whole format. Unknown keys are an error so a typo cannot
 silently change what runs.
+
+## The anthropic backend
+
+`backend: anthropic` runs the sweep against Claude models over the
+Anthropic API instead of local Ollama models. It needs an explicit
+candidates list of model ids and the `ANTHROPIC_API_KEY` environment
+variable:
+
+```yaml
+# api-sweep.yaml
+backend: anthropic
+candidates:
+  - claude-haiku-4-5
+  - claude-sonnet-4-5
+```
+
+```
+export ANTHROPIC_API_KEY=sk-ant-...
+quantproof run --pack <dir> --config api-sweep.yaml
+```
+
+List valid model ids with `quantproof models --backend anthropic`.
+`use_local_models` does not apply (there is no local store to merge
+in), and VRAM/fit columns render not-applicable because inference runs
+on Anthropic hardware; see docs/methodology.md for exactly what is and
+is not measured on this backend.
 
 Notes:
 
