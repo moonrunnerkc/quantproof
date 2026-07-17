@@ -21,6 +21,7 @@
     "test:e2e": "vitest run --config vitest.e2e.config.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.112.1",
     "ajv": "^8.20.0",
     "better-sqlite3": "^12.11.1",
     "commander": "^15.0.0",
