@@ -6,6 +6,7 @@
  */
 
 import { Command } from 'commander';
+import { runCommand } from './command-run.js';
 import { registerBuiltinScorers } from '../scoring/builtin-scorers.js';
 import { listScorers } from '../scoring/scorer-registry.js';
 import { loadTaskPack, TaskPackError } from '../tasks/task-loader.js';
@@ -39,6 +40,22 @@ program
         return;
       }
       throw err;
+    }
+  });
+
+program
+  .command('run')
+  .description('Run a task pack against one model and print the measured result table')
+  .requiredOption('--pack <dir>', 'task pack directory')
+  .requiredOption('--model <name>', 'model name as the backend knows it, e.g. gemma3:1b')
+  .option('--db <path>', 'results database path', '.quantproof/results.db')
+  .option('--limit <n>', 'run only the first N examples', (v) => Number.parseInt(v, 10))
+  .action(async (options: { pack: string; model: string; db: string; limit?: number }) => {
+    try {
+      await runCommand(options);
+    } catch (err) {
+      console.error(err instanceof Error ? err.message : String(err));
+      process.exitCode = 1;
     }
   });
 
