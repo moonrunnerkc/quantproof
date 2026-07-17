@@ -7,6 +7,8 @@
 import { OllamaAdapter } from '../backends/ollama-adapter.js';
 import { buildResume, findResumableRun, verifyNoDrift } from '../orchestrator/recovery.js';
 import { executeSweep } from '../orchestrator/run-executor.js';
+import { renderComparison } from '../report/comparison-table.js';
+import { buildReportData } from '../report/report-data.js';
 import { renderSweepReport } from '../report/terminal-report.js';
 import { RunStore } from '../results/run-store.js';
 import { registerBuiltinScorers } from '../scoring/builtin-scorers.js';
@@ -56,7 +58,8 @@ export async function resumeCommand(options: ResumeCommandOptions): Promise<stri
         console.log(`  ${line}`);
       },
     });
-    const report = renderSweepReport(outcome);
+    const data = buildReportData(run, store.listCandidates(run.id), store.listUnitResults(run.id));
+    const report = renderSweepReport(outcome) + renderComparison(data);
     console.log(report);
     return report;
   } finally {

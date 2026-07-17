@@ -10,6 +10,8 @@ import { resolveCandidates } from '../catalog/model-resolver.js';
 import { executeSweep, prepareSweepJournal } from '../orchestrator/run-executor.js';
 import { assessCandidates, buildRunPlan, renderRunPlan } from '../orchestrator/run-planner.js';
 import { configFingerprint, packFingerprint } from '../orchestrator/recovery.js';
+import { renderComparison } from '../report/comparison-table.js';
+import { buildReportData } from '../report/report-data.js';
 import { renderSweepReport } from '../report/terminal-report.js';
 import { RunStore } from '../results/run-store.js';
 import { registerBuiltinScorers } from '../scoring/builtin-scorers.js';
@@ -116,7 +118,12 @@ export async function runCommand(options: RunCommandOptions): Promise<string> {
         console.log(`  ${line}`);
       },
     });
-    const report = renderSweepReport(outcome);
+    const data = buildReportData(
+      outcome.run,
+      store.listCandidates(outcome.run.id),
+      store.listUnitResults(outcome.run.id),
+    );
+    const report = renderSweepReport(outcome) + renderComparison(data);
     console.log(report);
     return report;
   } finally {
