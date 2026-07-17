@@ -131,14 +131,14 @@ export class OllamaAdapter implements BackendAdapter {
   }
 
   private async pull(model: string): Promise<void> {
-    const response = await this.request('/api/pull', {
-      method: 'POST',
-      body: JSON.stringify({ model, stream: true }),
-    });
-    if (response.body === null) {
-      throw new Error(`Ollama /api/pull returned no body for "${model}"; retry with: ollama pull ${model}`);
-    }
     try {
+      const response = await this.request('/api/pull', {
+        method: 'POST',
+        body: JSON.stringify({ model, stream: true }),
+      });
+      if (response.body === null) {
+        throw new Error('the server returned no body');
+      }
       for await (const line of readLines(response.body)) {
         parsePullLine(line);
       }

@@ -11,6 +11,7 @@ import { modelsCommand } from './command-models.js';
 import { reportCommand } from './command-report.js';
 import { resumeCommand } from './command-resume.js';
 import { runCommand } from './command-run.js';
+import { journalFailureHint } from '../results/run-store.js';
 import { registerBuiltinScorers } from '../scoring/builtin-scorers.js';
 import { listScorers } from '../scoring/scorer-registry.js';
 import { loadTaskPack, TaskPackError } from '../tasks/task-loader.js';
@@ -60,7 +61,8 @@ program
     try {
       await runCommand(options);
     } catch (err) {
-      console.error(err instanceof Error ? err.message : String(err));
+      const hint = journalFailureHint(err, options.db);
+      console.error(hint?.message ?? (err instanceof Error ? err.message : String(err)));
       process.exitCode = 1;
     }
   });
@@ -73,7 +75,8 @@ program
     try {
       await resumeCommand(options);
     } catch (err) {
-      console.error(err instanceof Error ? err.message : String(err));
+      const hint = journalFailureHint(err, options.db);
+      console.error(hint?.message ?? (err instanceof Error ? err.message : String(err)));
       process.exitCode = 1;
     }
   });

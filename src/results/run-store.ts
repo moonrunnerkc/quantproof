@@ -59,6 +59,34 @@ CREATE TABLE IF NOT EXISTS scores (
 );
 `;
 
+/**
+ * Translates a mid-run journal write failure into an actionable
+ * message. The journal is transactional per unit, so everything that
+ * finished before the failure is already safe on disk.
+ *
+ * @param err - The error thrown by a store write.
+ * @param dbPath - The database path, for the message.
+ * @returns A replacement error with the fix, or null when the error is
+ *   not a recognized storage failure (callers rethrow the original).
+ */
+export function journalFailureHint(err: unknown, dbPath: string): Error | null {
+  const code = err instanceof Error && 'code' in err ? String((err as { code: unknown }).code) : '';
+  const detail = err instanceof Error ? err.message : String(err);
+  if (code === 'SQLITE_FULL' || code === 'ENOSPC') {
+    return new Error(
+      `the disk filled up while journaling results to ${dbPath}; every completed unit is already saved, so free some space and continue with: quantproof resume`,
+      { cause: err },
+    );
+  }
+  if (code === 'SQLITE_READONLY' || code === 'SQLITE_IOERR' || code === 'EACCES' || code === 'EROFS') {
+    return new Error(
+      `the results database ${dbPath} stopped being writable (${detail}); completed units are saved, so fix the permissions or disk and continue with: quantproof resume`,
+      { cause: err },
+    );
+  }
+  return null;
+}
+
 /** Open handle on the results database. */
 export class RunStore {
   private readonly db: Database.Database;
@@ -72,15 +100,38 @@ export class RunStore {
    * applies WAL mode, and ensures the schema exists.
    *
    * @param dbPath - Database file path, e.g. ".quantproof/results.db".
-   * @returns An open store. Throws when the path is not writable.
+   * @returns An open store.
+   * @throws Error naming the path and the fix when the directory is
+   *   not writable or the file exists but is not a SQLite database.
    */
   static open(dbPath: string): RunStore {
-    mkdirSync(dirname(dbPath), { recursive: true });
-    const db = new Database(dbPath);
-    db.pragma('journal_mode = WAL');
-    db.pragma('foreign_keys = ON');
-    db.exec(SCHEMA);
-    return new RunStore(db);
+    try {
+      mkdirSync(dirname(dbPath), { recursive: true });
+    } catch (err) {
+      throw new Error(
+        `cannot create the results directory ${dirname(dbPath)} (${err instanceof Error ? err.message : String(err)}); pick a writable location with --db <path>`,
+        { cause: err },
+      );
+    }
+    try {
+      const db = new Database(dbPath);
+      db.pragma('journal_mode = WAL');
+      db.pragma('foreign_keys = ON');
+      db.exec(SCHEMA);
+      return new RunStore(db);
+    } catch (err) {
+      const code = err instanceof Error && 'code' in err ? String((err as { code: unknown }).code) : '';
+      if (code === 'SQLITE_NOTADB') {
+        throw new Error(
+          `${dbPath} exists but is not a quantproof results database (corrupt or a different file); move it aside (mv ${dbPath} ${dbPath}.bad) and rerun`,
+          { cause: err },
+        );
+      }
+      throw new Error(
+        `cannot open results database ${dbPath} (${err instanceof Error ? err.message : String(err)}); check file permissions or pick another path with --db <path>`,
+        { cause: err },
+      );
+    }
   }
 
   /** Persists a new run row. */
