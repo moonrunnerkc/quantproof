@@ -12,6 +12,7 @@ import { reportCommand } from './command-report.js';
 import { resumeCommand } from './command-resume.js';
 import { runCommand } from './command-run.js';
 import { journalFailureHint } from '../results/run-store.js';
+import { checkExpectedValues } from '../scoring/plan-check.js';
 import { registerBuiltinScorers } from '../scoring/builtin-scorers.js';
 import { listScorers } from '../scoring/scorer-registry.js';
 import { loadTaskPack, TaskPackError } from '../tasks/task-loader.js';
@@ -34,6 +35,10 @@ program
   .action((packDir: string) => {
     try {
       const pack = loadTaskPack(packDir, listScorers());
+      const authoringProblems = checkExpectedValues(pack);
+      if (authoringProblems.length > 0) {
+        throw new TaskPackError(packDir, authoringProblems);
+      }
       console.log(
         `task pack "${pack.manifest.name}" is valid: ${String(pack.examples.length)} examples, scorer ${pack.manifest.scorer}` +
           (pack.gates.length > 0 ? `, gates: ${pack.gates.map((g) => g.scorer).join(', ')}` : ''),

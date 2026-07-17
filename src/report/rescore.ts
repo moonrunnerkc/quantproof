@@ -10,8 +10,7 @@ import { packFingerprint } from '../orchestrator/recovery.js';
 import type { RunRecord, UnitResult } from '../results/record-types.js';
 import { registerBuiltinScorers } from '../scoring/builtin-scorers.js';
 import { scoreWithGates } from '../scoring/gate-composition.js';
-import type { BoundScorer } from '../scoring/gate-composition.js';
-import { getScorer } from '../scoring/scorer-registry.js';
+import { bindPackScorers } from '../scoring/plan-check.js';
 import { listScorers } from '../scoring/scorer-registry.js';
 import { loadTaskPack } from '../tasks/task-loader.js';
 import type { LoadedTaskPack } from '../tasks/task-loader.js';
@@ -24,17 +23,6 @@ export interface RescoreResult {
   readonly notes: readonly string[];
   /** The loaded pack when it still matches the run; null otherwise. */
   readonly pack: LoadedTaskPack | null;
-}
-
-function boundScorers(pack: LoadedTaskPack): { primary: BoundScorer; gates: BoundScorer[] } {
-  return {
-    primary: {
-      name: pack.manifest.scorer,
-      scorer: getScorer(pack.manifest.scorer),
-      params: pack.scorerParams,
-    },
-    gates: pack.gates.map((g) => ({ name: g.scorer, scorer: getScorer(g.scorer), params: g.scorerParams })),
-  };
 }
 
 /**
@@ -74,7 +62,7 @@ export function rescoreUnits(run: RunRecord, units: readonly UnitResult[]): Resc
     };
   }
 
-  const { primary, gates } = boundScorers(pack);
+  const { primary, gates } = bindPackScorers(pack);
   const expectedById = new Map(pack.examples.map((e) => [e.id, e.expected]));
   let changed = 0;
   let checked = 0;

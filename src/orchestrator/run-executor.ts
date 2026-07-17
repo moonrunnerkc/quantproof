@@ -10,7 +10,7 @@
 import { randomUUID } from 'node:crypto';
 import type { BackendAdapter } from '../backends/backend-adapter.js';
 import { registerBuiltinScorers } from '../scoring/builtin-scorers.js';
-import { getScorer } from '../scoring/scorer-registry.js';
+import { bindPackScorers } from '../scoring/plan-check.js';
 import type { LoadedTaskPack } from '../tasks/task-loader.js';
 import { startVramProbe, queryVramOnce } from '../telemetry/vram-probe.js';
 import type { GpuInfo, VramProbe, VramProbeResult, VramSnapshot } from '../telemetry/vram-probe.js';
@@ -175,10 +175,7 @@ export async function executeSweep(
   const progress = options.onProgress ?? ((): void => undefined);
   const sleep = options.sleep ?? ((ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms)));
   const sample = options.sampleVram ?? (() => queryVramOnce());
-  const scorers = {
-    primary: { name: pack.manifest.scorer, scorer: getScorer(pack.manifest.scorer), params: pack.scorerParams },
-    gates: pack.gates.map((g) => ({ name: g.scorer, scorer: getScorer(g.scorer), params: g.scorerParams })),
-  };
+  const scorers = bindPackScorers(pack);
 
   const outcomes: CandidateSweepOutcome[] = [];
   let measuredTps: number | null = null;

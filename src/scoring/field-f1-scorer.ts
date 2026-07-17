@@ -54,9 +54,11 @@ function fieldsEqual(actual: unknown, expected: unknown): boolean {
  * @param expected - The expected object from the example file.
  * @param params - Requires `key_fields`: non-empty string array.
  * @returns F1 as score, with per-field status plus precision, recall,
- *   and F1 in details. Non-JSON output or a non-object expected value
- *   scores 0 with the reason in details.
- * @throws Error only when `params.key_fields` is invalid.
+ *   and F1 in details. Non-JSON output scores 0 with the reason in
+ *   details.
+ * @throws Error when `params.key_fields` is invalid or the example's
+ *   expected value is not an object; both are pack authoring errors,
+ *   never model failures.
  */
 export function fieldF1Scorer(
   output: string,
@@ -66,14 +68,9 @@ export function fieldF1Scorer(
   const keyFields = requireStringArray('field-f1', params, 'key_fields');
 
   if (typeof expected !== 'object' || expected === null || Array.isArray(expected)) {
-    return {
-      score: 0,
-      pass: false,
-      details: {
-        reason:
-          'expected value is not an object; field-f1 examples need an object under "expected" with the key fields as properties',
-      },
-    };
+    throw new Error(
+      `field-f1 example has expected value ${JSON.stringify(expected)}, but this scorer needs an object with the key fields as properties; fix the example file`,
+    );
   }
   const expectedRecord = expected as Record<string, unknown>;
 

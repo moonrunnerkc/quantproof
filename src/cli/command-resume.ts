@@ -12,8 +12,9 @@ import { buildReportData } from '../report/report-data.js';
 import { renderSweepReport } from '../report/terminal-report.js';
 import { RunStore } from '../results/run-store.js';
 import { registerBuiltinScorers } from '../scoring/builtin-scorers.js';
+import { checkExpectedValues } from '../scoring/plan-check.js';
 import { listScorers } from '../scoring/scorer-registry.js';
-import { loadTaskPack } from '../tasks/task-loader.js';
+import { loadTaskPack, TaskPackError } from '../tasks/task-loader.js';
 import { limitPack } from './command-run.js';
 
 /** Options parsed from the command line. */
@@ -46,6 +47,10 @@ export async function resumeCommand(options: ResumeCommandOptions): Promise<stri
       loadTaskPack(run.packDir, listScorers()),
       run.plan.limit ?? undefined,
     );
+    const authoringProblems = checkExpectedValues(pack);
+    if (authoringProblems.length > 0) {
+      throw new TaskPackError(run.packDir, authoringProblems);
+    }
     const prepared = buildResume(store, run);
     console.log(
       `resuming run ${run.id} (${run.packName}): ${String(prepared.entries.length)} candidate${prepared.entries.length === 1 ? '' : 's'} with ` +

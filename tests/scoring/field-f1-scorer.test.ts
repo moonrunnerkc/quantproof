@@ -93,10 +93,10 @@ describe('fieldF1Scorer', () => {
     expect(fieldF1Scorer(output, expected, params).pass).toBe(true);
   });
 
-  it('scores zero when the expected value is not an object', () => {
-    const record = fieldF1Scorer('{"a": 1}', 'not-an-object', params);
-    expect(record.score).toBe(0);
-    expect(record.details['reason']).toContain('expected value is not an object');
+  it('throws a task-authoring error when the expected value is not an object', () => {
+    expect(() => fieldF1Scorer('{"a": 1}', 'not-an-object', params)).toThrow(
+      /needs an object with the key fields as properties; fix the example file/,
+    );
   });
 
   it('throws a task-authoring error when key_fields is missing', () => {

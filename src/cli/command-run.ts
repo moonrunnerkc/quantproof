@@ -15,8 +15,9 @@ import { buildReportData } from '../report/report-data.js';
 import { renderSweepReport } from '../report/terminal-report.js';
 import { RunStore } from '../results/run-store.js';
 import { registerBuiltinScorers } from '../scoring/builtin-scorers.js';
+import { checkExpectedValues } from '../scoring/plan-check.js';
 import { listScorers } from '../scoring/scorer-registry.js';
-import { loadTaskPack } from '../tasks/task-loader.js';
+import { loadTaskPack, TaskPackError } from '../tasks/task-loader.js';
 import type { LoadedTaskPack } from '../tasks/task-loader.js';
 import { queryGpuIdentity, queryVramOnce } from '../telemetry/vram-probe.js';
 
@@ -57,6 +58,10 @@ export function limitPack(pack: LoadedTaskPack, limit: number | undefined): Load
 export async function runCommand(options: RunCommandOptions): Promise<string> {
   registerBuiltinScorers();
   const pack = limitPack(loadTaskPack(options.pack, listScorers()), options.limit);
+  const authoringProblems = checkExpectedValues(pack);
+  if (authoringProblems.length > 0) {
+    throw new TaskPackError(options.pack, authoringProblems);
+  }
   const adapter = new OllamaAdapter(options.baseUrl);
   const backendVersion = await adapter.version();
 
