@@ -35,6 +35,8 @@ export class FakeAdapter implements BackendAdapter {
 
   /** Models returned by listModels; tests may replace the contents. */
   localModels: ModelDescriptor[] = [];
+  /** Models whose load() should throw, mapped to the error message. */
+  loadErrors: Record<string, string> = {};
 
   version(): Promise<string> {
     return Promise.resolve('fake-backend 1.0');
@@ -59,7 +61,8 @@ export class FakeAdapter implements BackendAdapter {
 
   load(model: string, context: number): Promise<void> {
     this.loads.push({ model, context });
-    return Promise.resolve();
+    const error = this.loadErrors[model];
+    return error === undefined ? Promise.resolve() : Promise.reject(new Error(error));
   }
 
   generate(model: string, request: GenerationRequest): GenerationStream {

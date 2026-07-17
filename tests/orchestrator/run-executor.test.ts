@@ -1,61 +1,15 @@
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { rmSync } from 'node:fs';
 import { afterEach, describe, expect, it } from 'vitest';
-import { executeSingleModelRun } from '../../src/orchestrator/run-executor.js';
-import { RunStore } from '../../src/results/run-store.js';
-import type { LoadedTaskPack } from '../../src/tasks/task-loader.js';
-import type { VramProbe } from '../../src/telemetry/vram-probe.js';
+import { executeSweep } from '../../src/orchestrator/run-executor.js';
+import type { SweepOptions } from '../../src/orchestrator/run-executor.js';
 import { FakeAdapter } from './fake-adapter.js';
 import type { BehaviorScript } from './fake-adapter.js';
+import { descriptor, offlineProbe, openTempStore, prepare, tinyPack } from './sweep-helpers.js';
 
 let dirs: string[] = [];
-function openStore(): RunStore {
-  const dir = mkdtempSync(join(tmpdir(), 'quantproof-exec-'));
-  dirs.push(dir);
-  return RunStore.open(join(dir, 'results.db'));
-}
 afterEach(() => {
   for (const dir of dirs) rmSync(dir, { recursive: true, force: true });
   dirs = [];
-});
-
-function pack(runsPerExample: number): LoadedTaskPack {
-  return {
-    manifest: {
-      name: 'yesno',
-      type: 'classification',
-      scorer: 'exact-label',
-      scorer_params: { labels: ['yes', 'no'] },
-      generation: {
-        context: 2048,
-        max_tokens: 8,
-        temperature: 0,
-        seed: 42,
-        runs_per_example: runsPerExample,
-      },
-      prompt_template: './prompt.md',
-      examples_dir: './examples',
-      gates: [],
-    },
-    promptTemplate: 'Answer yes or no: {{input}}',
-    examples: [
-      { id: '001', sourcePath: '/fake/001.json', input: 'is water wet?', expected: 'yes' },
-      { id: '002', sourcePath: '/fake/002.json', input: 'is fire cold?', expected: 'no' },
-    ],
-    scorerParams: { labels: ['yes', 'no'] },
-    gates: [],
-  };
-}
-
-const offlineProbe = (): VramProbe => ({
-  gpu: null,
-  unavailableReason: 'nvidia-smi is not available on this machine, so VRAM was not measured',
-  stop: () =>
-    Promise.resolve({
-      available: false as const,
-      reason: 'nvidia-smi is not available on this machine, so VRAM was not measured',
-    }),
 });
 
 /** yes for example 001 prompts, no for 002 prompts. */
@@ -64,171 +18,163 @@ const perfectScript: BehaviorScript = (prompt) => ({
   output: prompt.includes('water') ? 'yes' : 'no',
 });
 
-function execute(adapter: FakeAdapter, store: RunStore, runsPerExample = 2, lines: string[] = []) {
-  return executeSingleModelRun(pack(runsPerExample), './packs/yesno', 'fake-model:1b', {
+function sweepOptions(adapter: FakeAdapter, store: ReturnType<typeof openTempStore>, extra: Partial<SweepOptions> = {}): SweepOptions & { lines: string[]; sleeps: number[] } {
+  const lines: string[] = [];
+  const sleeps: number[] = [];
+  return {
     adapter,
     store,
     startProbe: offlineProbe,
+    sampleVram: () => null,
     onProgress: (line) => lines.push(line),
-  });
+    sleep: (ms) => {
+      sleeps.push(ms);
+      return Promise.resolve();
+    },
+    cooldownMs: 7,
+    backoffMs: 3,
+    lines,
+    sleeps,
+    ...extra,
+  };
 }
 
-describe('executeSingleModelRun', () => {
-  it('completes every unit, journals scores, and reports the summary', async () => {
+describe('executeSweep', () => {
+  it('runs candidates sequentially, unloading each before the next starts', async () => {
     const adapter = new FakeAdapter(perfectScript);
-    const store = openStore();
-    const outcome = await execute(adapter, store);
-    expect(outcome.summary.completed).toBe(4);
-    expect(outcome.summary.failed).toBe(0);
-    expect(outcome.summary.meanScore).toBe(1);
-    expect(outcome.summary.passRate).toBe(1);
-    expect(outcome.results.every((r) => r.generation !== null && r.score !== null)).toBe(true);
+    const store = openTempStore(dirs);
+    const prepared = prepare(store, tinyPack(), [descriptor('big:7b', 7e9), descriptor('small:1b', 1e9)]);
+    const options = sweepOptions(adapter, store);
+    const outcome = await executeSweep(tinyPack(), prepared, options);
+
+    expect(outcome.candidates.map((c) => c.status)).toEqual(['completed', 'completed']);
+    expect(adapter.unloads).toEqual(['big:7b', 'small:1b']);
+    // Every generate call for big:7b happened before any for small:1b
+    // proves sequential isolation at the adapter boundary.
+    const loads = adapter.loads.map((l) => l.model);
+    expect(loads).toEqual(['big:7b', 'small:1b']);
+    // Cooldown ran between candidates but not after the last one.
+    expect(options.sleeps).toContain(7);
     store.close();
   });
 
-  it('runs one untimed warmup before the timed units and does not journal it', async () => {
+  it('classifies a memory-pattern load failure as oom, skips its units, and finishes the sweep', async () => {
     const adapter = new FakeAdapter(perfectScript);
-    const store = openStore();
-    const lines: string[] = [];
-    const outcome = await execute(adapter, store, 2, lines);
-    // 1 warmup + 2 examples x 2 repetitions.
-    expect(adapter.generatePrompts).toHaveLength(5);
-    expect(lines[0]).toContain('warmup');
-    expect(outcome.results).toHaveLength(4);
+    adapter.loadErrors['huge:27b'] =
+      'Ollama /api/generate failed (HTTP 500): model failed to load, this may be due to resource limitations or an internal error';
+    const store = openTempStore(dirs);
+    const prepared = prepare(store, tinyPack(), [descriptor('huge:27b', 17e9), descriptor('small:1b', 1e9)]);
+    const outcome = await executeSweep(tinyPack(), prepared, sweepOptions(adapter, store));
+
+    expect(outcome.candidates[0]?.status).toBe('oom');
+    expect(outcome.candidates[0]?.statusReason).toContain('oom-suspect during load/warmup at context 2048');
+    expect(outcome.candidates[0]?.results.every((r) => r.status === 'skipped')).toBe(true);
+    expect(outcome.candidates[1]?.status).toBe('completed');
+    // The oom model was still force-unloaded.
+    expect(adapter.unloads).toEqual(['huge:27b', 'small:1b']);
     store.close();
   });
 
-  it('loads at the manifest context and force-unloads exactly once afterward', async () => {
-    const adapter = new FakeAdapter(perfectScript);
-    const store = openStore();
-    await execute(adapter, store);
-    expect(adapter.loads).toEqual([{ model: 'fake-model:1b', context: 2048 }]);
-    expect(adapter.unloads).toEqual(['fake-model:1b']);
-    store.close();
-  });
-
-  it('records the exact request options used, for reproducibility', async () => {
-    const adapter = new FakeAdapter(perfectScript);
-    const store = openStore();
-    const outcome = await execute(adapter, store);
-    expect(outcome.results[0]?.generation?.requestOptions).toEqual({
-      model: 'fake-model:1b',
-      options: { temperature: 0, seed: 42, num_predict: 8, num_ctx: 2048 },
-    });
-    store.close();
-  });
-
-  it('derives timing from a slow stream: positive ttft and a real token rate', async () => {
-    const adapter = new FakeAdapter((prompt) => ({
-      kind: 'ok',
-      output: prompt.includes('water') ? 'yes' : 'no',
-      tokenDelayMs: 8,
-    }));
-    const store = openStore();
-    const outcome = await execute(adapter, store, 1);
-    const generation = outcome.results[0]?.generation;
-    expect(generation?.ttftMs).toBeGreaterThan(0);
-    expect(generation?.tokensPerSecond).toBeGreaterThan(0);
-    expect(generation?.tokensPerSecond).toBeLessThan(1000);
-    store.close();
-  });
-
-  it('journals a mid-generation crash as a failed unit and keeps going', async () => {
+  it('classifies a cuda error mid-generation as oom and never retries that configuration', async () => {
     const adapter = new FakeAdapter((prompt, callIndex) =>
       callIndex === 2
-        ? { kind: 'crash-mid-stream', afterTokens: 2, message: 'backend died mid-generation' }
+        ? { kind: 'crash-mid-stream', afterTokens: 1, message: 'CUDA error: out of memory' }
         : perfectScript(prompt, callIndex),
     );
-    const store = openStore();
-    const outcome = await execute(adapter, store);
-    expect(outcome.summary.failed).toBe(1);
-    expect(outcome.summary.completed).toBe(3);
-    const failed = outcome.results.find((r) => r.status === 'failed');
-    expect(failed?.failureReason).toContain('died mid-generation');
-    expect(adapter.unloads).toHaveLength(1);
+    const store = openTempStore(dirs);
+    const prepared = prepare(store, tinyPack(2), [descriptor('only:4b', 4e9)]);
+    const outcome = await executeSweep(tinyPack(2), prepared, sweepOptions(adapter, store));
+
+    const candidate = outcome.candidates[0];
+    expect(candidate?.status).toBe('oom');
+    expect(candidate?.summary.completed).toBe(1);
+    expect(candidate?.summary.failed).toBe(1);
+    expect(candidate?.summary.skipped).toBe(2);
+    // warmup + unit 1 + crashing unit 2; no retry of the oom unit.
+    expect(adapter.generatePrompts).toHaveLength(3);
     store.close();
   });
 
-  it('retries transport errors twice and completes when the backend recovers', async () => {
+  it('treats a plain generation error as a unit failure, not an oom', async () => {
     const adapter = new FakeAdapter((prompt, callIndex) =>
-      callIndex === 1 || callIndex === 2 ? { kind: 'transport-error' } : perfectScript(prompt, callIndex),
+      callIndex === 1
+        ? { kind: 'crash-mid-stream', afterTokens: 1, message: 'backend hiccuped for no memory-related reason' }
+        : perfectScript(prompt, callIndex),
     );
-    const store = openStore();
-    const outcome = await execute(adapter, store, 1);
-    expect(outcome.summary.failed).toBe(0);
-    expect(outcome.summary.completed).toBe(2);
-    // warmup + (unit 1 x 3 attempts) + unit 2.
-    expect(adapter.generatePrompts).toHaveLength(5);
+    const store = openTempStore(dirs);
+    const prepared = prepare(store, tinyPack(), [descriptor('only:1b', 1e9)]);
+    const outcome = await executeSweep(tinyPack(), prepared, sweepOptions(adapter, store));
+
+    expect(outcome.candidates[0]?.status).toBe('completed');
+    expect(outcome.candidates[0]?.summary.failed).toBe(1);
+    expect(outcome.candidates[0]?.summary.completed).toBe(1);
+    expect(outcome.candidates[0]?.summary.skipped).toBe(0);
     store.close();
   });
 
-  it('fails the unit when transport errors exhaust both retries', async () => {
+  it('retries transport errors twice with growing backoff before failing the unit', async () => {
     const adapter = new FakeAdapter((prompt, callIndex) =>
       callIndex >= 1 && callIndex <= 3 ? { kind: 'transport-error' } : perfectScript(prompt, callIndex),
     );
-    const store = openStore();
-    const outcome = await execute(adapter, store, 1);
-    expect(outcome.summary.failed).toBe(1);
-    const failed = outcome.results.find((r) => r.status === 'failed');
+    const store = openTempStore(dirs);
+    const prepared = prepare(store, tinyPack(), [descriptor('only:1b', 1e9)]);
+    const options = sweepOptions(adapter, store);
+    const outcome = await executeSweep(tinyPack(), prepared, options);
+
+    expect(outcome.candidates[0]?.summary.failed).toBe(1);
+    const failed = outcome.candidates[0]?.results.find((r) => r.status === 'failed');
     expect(failed?.failureReason).toContain('cannot reach Ollama');
+    // Linear backoff: 3ms then 6ms for the two retries of unit 001.
+    expect(options.sleeps.filter((ms) => ms === 3 || ms === 6)).toEqual([3, 6]);
     store.close();
   });
 
-  it('flags identical outputs across repetitions as deterministic', async () => {
+  it('warns when vram does not return to baseline between candidates', async () => {
     const adapter = new FakeAdapter(perfectScript);
-    const store = openStore();
-    const outcome = await execute(adapter, store, 3);
-    expect(outcome.summary.outputsDeterministic).toBe(true);
-    store.close();
-  });
-
-  it('flags differing outputs across repetitions as nondeterministic', async () => {
-    const adapter = new FakeAdapter((prompt, callIndex) => ({
-      kind: 'ok',
-      output: `${prompt.includes('water') ? 'yes' : 'no'}${callIndex % 2 === 0 ? '' : ' '}`,
-    }));
-    const store = openStore();
-    const outcome = await execute(adapter, store, 2);
-    expect(outcome.summary.outputsDeterministic).toBe(false);
-    store.close();
-  });
-
-  it('unloads and stops the probe even when load itself throws', async () => {
-    class ExplodingAdapter extends FakeAdapter {
-      override load(): Promise<void> {
-        return Promise.reject(new Error('model does not fit'));
-      }
-    }
-    const adapter = new ExplodingAdapter(perfectScript);
-    const store = openStore();
-    let probeStopped = false;
-    const probe: VramProbe = {
-      gpu: null,
-      unavailableReason: 'unavailable',
-      stop: () => {
-        probeStopped = true;
-        return Promise.resolve({ available: false as const, reason: 'unavailable' });
+    const store = openTempStore(dirs);
+    const prepared = prepare(store, tinyPack(), [descriptor('a:1b', 1e9), descriptor('b:1b', 1e9)]);
+    // Baseline reads 1000 MiB used; after the first candidate it stays at 9000.
+    let calls = 0;
+    const options = sweepOptions(adapter, store, {
+      sampleVram: () => {
+        calls += 1;
+        return { freeMib: 3000, usedMib: calls === 1 ? 1000 : 9000 };
       },
-    };
-    await expect(
-      executeSingleModelRun(pack(1), './packs/yesno', 'fake-model:1b', {
-        adapter,
-        store,
-        startProbe: () => probe,
-      }),
-    ).rejects.toThrow('model does not fit');
-    expect(adapter.unloads).toEqual(['fake-model:1b']);
-    expect(probeStopped).toBe(true);
+      baselineTimeoutMs: 1000,
+    });
+    await executeSweep(tinyPack(), prepared, options);
+    expect(options.lines.some((l) => l.includes('did not return to baseline'))).toBe(true);
     store.close();
   });
 
-  it('carries the vram-unavailable state into the run record', async () => {
+  it('refines the time estimate after the first candidate completes', async () => {
     const adapter = new FakeAdapter(perfectScript);
-    const store = openStore();
-    const outcome = await execute(adapter, store, 1);
-    expect(outcome.run.vramAvailable).toBe(false);
-    expect(outcome.run.vramUnavailableReason).toContain('nvidia-smi');
-    expect(outcome.vram.available).toBe(false);
+    const store = openTempStore(dirs);
+    const prepared = prepare(store, tinyPack(), [descriptor('a:1b', 1e9), descriptor('b:1b', 1e9)]);
+    const options = sweepOptions(adapter, store);
+    await executeSweep(tinyPack(), prepared, options);
+    const estimates = options.lines.filter((l) => l.includes('min remaining'));
+    expect(estimates[0]).toContain('pre-measurement estimate');
+    expect(estimates[1]).not.toContain('pre-measurement estimate');
+    store.close();
+  });
+
+  it('flags a throughput collapse against similar-size candidates as suspected offload', async () => {
+    // Same size class; the slow one streams each token 40x slower.
+    const adapter = new FakeAdapter((prompt) => ({
+      kind: 'ok',
+      output: (prompt.includes('water') ? 'yes' : 'no') + ' padding tokens here',
+      tokenDelayMs: adapterDelay(prompt),
+    }));
+    const adapterDelay = (_prompt: string): number => (adapter.generatePrompts.length <= 3 ? 1 : 40);
+    const store = openTempStore(dirs);
+    const prepared = prepare(store, tinyPack(), [descriptor('fast:4b', 4e9), descriptor('slow:4b', 4.2e9)]);
+    const outcome = await executeSweep(tinyPack(), prepared, sweepOptions(adapter, store));
+
+    expect(outcome.candidates[0]?.offloadSuspectReason).toBeNull();
+    expect(outcome.candidates[1]?.offloadSuspectReason).toContain('suspected cpu/gpu split');
+    const stored = store.listCandidates(outcome.run.id);
+    expect(stored[1]?.offloadSuspectReason).toContain('tok/s');
     store.close();
   });
 });

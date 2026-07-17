@@ -17,6 +17,8 @@ export interface RunSummary {
   readonly completed: number;
   readonly failed: number;
   readonly pending: number;
+  /** Units skipped without running (an OOM candidate's remainder). */
+  readonly skipped: number;
   /** Mean score over all completed units. Null with zero completions. */
   readonly meanScore: number | null;
   /** Fraction of completed units that passed. Null with zero completions. */
@@ -92,6 +94,7 @@ export function summarizeRun(results: readonly UnitResult[]): RunSummary {
     completed: done.length,
     failed: results.filter((r) => r.status === 'failed').length,
     pending: results.filter((r) => r.status === 'pending').length,
+    skipped: results.filter((r) => r.status === 'skipped').length,
     meanScore: scores.length === 0 ? null : mean(scores),
     passRate: done.length === 0 ? null : done.filter((r) => r.score?.pass === true).length / done.length,
     repetitions,
