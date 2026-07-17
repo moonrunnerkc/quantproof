@@ -62,7 +62,7 @@ function row(aggregate: CandidateAggregate, flags: readonly Flag[]): string[] {
           : `${fmtMib(aggregate.measuredPeakMib)} (${fmtSignedPercent(aggregate.vramDeltaPercent)}%)`;
   return [
     aggregate.candidate.modelName,
-    aggregate.candidate.quantization ?? '?',
+    aggregate.candidate.fitVerdict === 'not-applicable' ? '-' : (aggregate.candidate.quantization ?? '?'),
     fmtWithSpread(s.meanScore, s.scoreSpread, fmtScore),
     s.passRate === null ? '-' : (s.passRate * 100).toFixed(1),
     s.ttftMedianMs === null ? '-' : fmtMs(s.ttftMedianMs),
@@ -117,10 +117,13 @@ export function renderTokenSpend(units: readonly UnitResult[]): string {
  */
 export function renderComparison(data: ReportData): string {
   const { run } = data;
+  const reason = run.vramUnavailableReason ?? 'no GPU telemetry';
   const gpu =
-    run.gpuName === null
-      ? `VRAM not measured: ${run.vramUnavailableReason ?? 'no GPU telemetry'}`
-      : `${run.gpuName} (driver ${run.driverVersion ?? 'unknown'})`;
+    run.gpuName !== null
+      ? `${run.gpuName} (driver ${run.driverVersion ?? 'unknown'})`
+      : reason.startsWith('API backend')
+        ? reason
+        : `VRAM not measured: ${reason}`;
   const lines: string[] = [
     '',
     `${run.packName}: ${String(data.aggregates.length)} candidate${data.aggregates.length === 1 ? '' : 's'} | ${run.backendVersion} | ${gpu}`,

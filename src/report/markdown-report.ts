@@ -80,6 +80,7 @@ function resultsRow(aggregate: CandidateAggregate, footnotes: readonly Footnote[
   const ttft = fmtWithSpread(s.ttftMedianMs, s.ttftSpreadMs, fmtMs);
   const rate = fmtWithSpread(s.tokensPerSecondMedian, s.tokensPerSecondSpread, fmtRate);
   const apiCandidate = aggregate.candidate.fitVerdict === 'not-applicable';
+  const quant = apiCandidate ? '-' : (aggregate.candidate.quantization ?? '?');
   const vram = apiCandidate
     ? 'not applicable'
     : aggregate.measuredPeakMib === null
@@ -90,7 +91,7 @@ function resultsRow(aggregate: CandidateAggregate, footnotes: readonly Footnote[
       ? '-'
       : `${fmtMib(aggregate.predictedPeakMib)}${aggregate.vramDeltaPercent === null ? '' : ` (${fmtSignedPercent(aggregate.vramDeltaPercent)}%)`}`;
   const markers = footnotes.map((f) => f.marker).join(' ');
-  return `| ${aggregate.candidate.modelName} | ${aggregate.candidate.quantization ?? '?'} | ${quality} | ${pass} | ${ttft} | ${rate} | ${vram} | ${predicted} | ${markers} |`;
+  return `| ${aggregate.candidate.modelName} | ${quant} | ${quality} | ${pass} | ${ttft} | ${rate} | ${vram} | ${predicted} | ${markers} |`;
 }
 
 function environmentSection(run: RunRecord, aggregates: readonly CandidateAggregate[]): string[] {
@@ -113,7 +114,7 @@ function environmentSection(run: RunRecord, aggregates: readonly CandidateAggreg
     '| --- | --- | --- | ---: | --- |',
     ...aggregates.map(
       (a) =>
-        `| ${a.candidate.modelName} | ${a.candidate.quantization ?? '-'} | ${a.candidate.parameterSize ?? '-'} | ${a.candidate.sizeBytes === 0 ? '-' : fmtMib(a.candidate.sizeBytes / (1024 * 1024))} | \`${a.candidate.digest.slice(0, 12)}\` |`,
+        `| ${a.candidate.modelName} | ${a.candidate.quantization ?? '-'} | ${a.candidate.parameterSize ?? '-'} | ${a.candidate.sizeBytes === 0 ? '-' : fmtMib(a.candidate.sizeBytes / (1024 * 1024))} | \`${a.candidate.digest === a.candidate.modelName ? a.candidate.digest : a.candidate.digest.slice(0, 12)}\` |`,
     ),
   ];
 }
@@ -131,7 +132,7 @@ function paretoSection(data: ReportData): string[] {
     ...frontier.map(
       (p) =>
         `- **${p.aggregate.candidate.modelName}**: quality ${fmtScore(p.quality)}, ` +
-        `${p.vramMib === null ? 'VRAM not measured' : `${fmtMib(p.vramMib)} MiB`}, ` +
+        `${p.vramMib !== null ? `${fmtMib(p.vramMib)} MiB` : p.aggregate.candidate.fitVerdict === 'not-applicable' ? 'VRAM not applicable' : 'VRAM not measured'}, ` +
         `${p.tokensPerSecond === null ? 'rate not measured' : `${fmtRate(p.tokensPerSecond)} tok/s`}`,
     ),
     ...(dominated.length > 0
@@ -197,11 +198,14 @@ export function renderMarkdownReport(data: ReportData): string {
     '',
     '## Methodology',
     '',
-    `Each example ran ${String(run.generation.runs_per_example)} time${run.generation.runs_per_example === 1 ? '' : 's'} at temperature ${String(run.generation.temperature)} with a fixed seed, after one untimed warmup per model; models ran strictly one at a time with forced unload and a cooldown between candidates. Quality spread is the range of per-repetition means. VRAM is polled via nvidia-smi during load and generation; the peak is the highest sample. Measurement limits (polling resolution, warmup policy, determinism caveats, partial-offload detection) are documented in [docs/methodology.md](docs/methodology.md).`,
+    api
+      ? `Each example ran ${String(run.generation.runs_per_example)} time${run.generation.runs_per_example === 1 ? '' : 's'} at temperature ${String(run.generation.temperature)} over the streaming Messages API, after one untimed warmup request per model. The API has no sampler seed, so repetitions are compared byte for byte and flagged when they differ. Time to first token includes the network path to the API; token counts come from the API's own usage fields. What is and is not measured on this backend is documented in [docs/methodology.md](docs/methodology.md).`
+      : `Each example ran ${String(run.generation.runs_per_example)} time${run.generation.runs_per_example === 1 ? '' : 's'} at temperature ${String(run.generation.temperature)} with a fixed seed, after one untimed warmup per model; models ran strictly one at a time with forced unload and a cooldown between candidates. Quality spread is the range of per-repetition means. VRAM is polled via nvidia-smi during load and generation; the peak is the highest sample. Measurement limits (polling resolution, warmup policy, determinism caveats, partial-offload detection) are documented in [docs/methodology.md](docs/methodology.md).`,
     '',
     '## Reproduce',
     '',
     '```',
+    ...(api ? ['export ANTHROPIC_API_KEY=sk-ant-...'] : []),
     reproductionCommand(run),
     '```',
     '',
