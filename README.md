@@ -7,21 +7,19 @@ recommendation (the smallest quant within 2% of the best measured
 quality).
 
 Fit calculators predict whether weights fit. Leaderboards rank models
-on benchmarks that are not your workload. The question that actually
-matters ("will Q4_K_M mangle my invoice extraction?") is only
-answerable by running your extraction on Q4_K_M and checking. That
-loop, packaged: sweep the candidates one at a time, score every output
-deterministically, measure VRAM and latency while doing it, report the
-spread, recommend.
+on benchmarks that are not your workload. The question that matters
+("will Q4_K_M mangle my invoice extraction?") is only answerable by
+running your extraction on Q4_K_M and checking. That loop, packaged:
+sweep the candidates one at a time, score every output
+deterministically, measure VRAM and latency, report the spread,
+recommend.
 
 ## Case study
 
-<!-- LAUNCH DATA GOES HERE: the RTX 5070 study (3 task packs, 10+
-     quant/model combinations) lands in this section, table and
-     recommendation verbatim from `quantproof report --markdown`. -->
+<!-- LAUNCH DATA GOES HERE: the RTX 5070 study (3 packs, 10+ quants),
+     table and recommendation verbatim from report --markdown. -->
 
-Results table and full methodology forthcoming; the format is the
-report this tool prints, unedited.
+Results forthcoming; the format is the report this tool prints, unedited.
 
 ## Run it on your task
 
