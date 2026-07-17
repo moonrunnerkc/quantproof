@@ -92,6 +92,28 @@ export class OllamaAdapter implements BackendAdapter {
     return allDescriptorsFromTags(await this.requestJson('/api/tags'));
   }
 
+  /**
+   * Fetches /api/show model_info for a model (Ollama-specific; the
+   * catalog uses it for fit prediction).
+   *
+   * @param model - Model name.
+   * @returns The model_info record, or null when the response lacks
+   *   one. Throws when the backend is unreachable.
+   */
+  async showModelInfo(model: string): Promise<Readonly<Record<string, unknown>> | null> {
+    const body = await this.requestJson('/api/show', {
+      method: 'POST',
+      body: JSON.stringify({ model }),
+    });
+    if (typeof body !== 'object' || body === null) {
+      return null;
+    }
+    const info = (body as Record<string, unknown>)['model_info'];
+    return typeof info === 'object' && info !== null && !Array.isArray(info)
+      ? (info as Record<string, unknown>)
+      : null;
+  }
+
   /** @inheritdoc */
   async ensureModelAvailable(model: string): Promise<ModelDescriptor> {
     const listed = descriptorFromTags(await this.requestJson('/api/tags'), model);
