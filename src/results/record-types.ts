@@ -95,6 +95,7 @@ export interface WorkUnitRecord {
   readonly repetition: number;
 }
 
+/** Work unit lifecycle; skipped marks an OOM candidate's remainder. */
 export type WorkUnitStatus = 'pending' | 'completed' | 'failed' | 'skipped';
 
 /** A candidate read back from the journal with its outcome so far. */

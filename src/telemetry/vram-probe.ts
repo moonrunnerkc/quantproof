@@ -43,6 +43,7 @@ export interface VramProbe {
   stop(): Promise<VramProbeResult>;
 }
 
+/** Probe tuning; production uses the defaults, tests override. */
 export interface VramProbeOptions {
   /** Binary to invoke; overridable so tests can supply a fake. */
   readonly binary?: string;

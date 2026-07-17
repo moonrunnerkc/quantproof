@@ -24,6 +24,7 @@ import {
   parsePullLine,
 } from './ollama-parse.js';
 
+/** Where a stock Ollama install listens. */
 export const DEFAULT_OLLAMA_URL = 'http://localhost:11434';
 
 /** Splits a streaming HTTP body into complete lines. */

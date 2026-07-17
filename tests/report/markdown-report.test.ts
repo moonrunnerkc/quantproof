@@ -83,7 +83,7 @@ describe('renderMarkdownReport', () => {
   });
 
   it('never emits an em dash or en dash anywhere', () => {
-    expect(renderMarkdownReport(caseStudyData())).not.toMatch(/[–—]/);
+    expect(renderMarkdownReport(caseStudyData())).not.toMatch(/[\u2013\u2014]/);
   });
 
   it('links the methodology doc and prints the exact reproduction command', () => {
