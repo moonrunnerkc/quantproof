@@ -81,6 +81,7 @@ of each section.
 - Terminal prose lines (recommendation, flags, reasons) wrap at 100 columns in the renderer; only table rows rely on column layout.
 - Phase 3 live gates, partial by request (local runs paused mid-session): sweep interrupted after the 27b OOM result and 19 qwen3:14b units; report rendered the partial journal honestly, bundle exported from it re-scored 19/19 outputs to identical values (verifyBundle 0 mismatches), python zipfile read the archive clean. Full-sweep skeptic-read gate and all VRAM gates remain; checklist in docs/local-verification.md under "Phase 3 report layer".
 - A bundle exported from a cwd where the run's relative packDir does not resolve omits scoring.json by design (the drift check cannot pass); observed live, worth knowing before exporting from outside the repo root.
+- Git history rewritten (author and committer on every commit) to moonrunnerkc <bradkinnard@proton.me>: the desktop had been committing as root@VivoBookBrads.(none), which GitHub attributes to nobody.
 
 ## Deferred
 
