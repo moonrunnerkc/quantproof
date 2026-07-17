@@ -1,5 +1,19 @@
 # Local verification: what still needs a real machine
 
+## Release follow-ups (v0.1.0 is live)
+
+Two manual owner steps remain after the 2026-07-16 release session:
+
+1. Add the API key as a repo secret, then run the live e2e once:
+
+   ```
+   gh secret set ANTHROPIC_API_KEY --repo moonrunnerkc/quantproof
+   gh workflow run e2e --repo moonrunnerkc/quantproof
+   ```
+
+2. The RTX 5070 case study (below) and its README section. npm publish
+   is deliberately not done; the release ships the tarball on GitHub.
+
 Everything below is what could not be verified in the dev sandbox
 (which has no GPU: no driver, no nvidia-smi, Ollama running CPU-only).
 Unit and e2e suites are green; these are the measurement gates.
