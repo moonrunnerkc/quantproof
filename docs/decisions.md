@@ -61,6 +61,27 @@ of each section.
 - Gate 4 (predicted vs measured VRAM within 15%) is unverifiable on this machine: predicted peaks are recorded for every candidate (18447 / 10190 / 3694 / 1854 MiB), but measured peak is null everywhere because there is no GPU and no nvidia-smi here; Ollama runs CPU-only (size_vram 0). The predicted-vs-measured delta rendering and the 15% check need one sweep on the 5070 host; nothing was waved off, there is simply no measurement to compare on this box.
 - Progress lines write through console.log; a downstream head/SIGPIPE kills the process mid-run, which the journal absorbs by design (it became an accidental extra crash test). Not treating EPIPE specially in v0.1.
 
+## Phase 3 (report, recommendation, CLI completion, docs)
+
+- Terminal comparison table shows the quality mean with its repetition spread inline; TTFT and tok/s show medians only there (width budget), with full min..max spreads in the markdown report. Spread accompanies every mean; medians carry spread where space allows.
+- Pareto eligibility: status completed, every completed unit passed every gate, quality present. OOM and failed candidates are excluded with their reason and surface as runners-up/nearest misses instead.
+- Pareto dominance treats a missing measurement (unmeasured VRAM) as incomparable on that axis: it can neither dominate nor be dominated through it. Exact ties all stay on the frontier.
+- Recommendation tolerance is relative (quality >= best x (1 - tolerance)), default 0.02, boundary inclusive; validated to [0, 1) with a fix hint.
+- When any within-tolerance candidate lacks a measured peak, all of them are ranked by weights on disk instead, and the recommendation sentence says so; mixing measured and proxy footprints in one ordering would be dishonest.
+- Footprint tie-breaks: quality, then tok/s, then model name, so the pick is deterministic.
+- ZIP writer and reader implemented in-repo against the documented format (deflate via node:zlib), same supply-chain rationale as the GGUF reader; archives are timestamped with the run start so identical runs export byte-identical bundles.
+- Bundle "config" is the plan snapshot plus generation params inside run.json, not a copy of the config file: the file can drift after the run, and the fingerprints in the snapshot detect exactly that.
+- Bundle carries scoring.json (scorer, params, gates, expected values) so verifyBundle can re-score raw outputs with no access to the original machine; omitted when the pack drifted, and verification then refuses loudly.
+- No stored scorer versions: the report command re-scores every retained output whenever the pack fingerprint still matches, swaps in fresh values, and notes how many changed. Pack drift or an unloadable pack falls back to stored scores with a note. Comparing values beats trusting a version string.
+- report --out with both --markdown and --bundle applies to the markdown file; the bundle keeps its derived name (one flag, two outputs, the markdown is the more commonly redirected).
+- run/resume keep the per-candidate detail blocks and append the comparison table plus recommendation at the end; report renders the compact view only.
+- models command previews fit at context 4096 by default (--context overrides) and says a sweep uses the pack's declared context.
+- init placeholders carry a replace_me key that example-loader rejects unconditionally with a replace-and-delete-the-key message; a scaffolded pack cannot run until real examples exist.
+- init prompts state their defaults; --yes or a non-TTY stdin accepts defaults silently, flags bypass prompts entirely. Scaffolds exist for all five scorers, with schema.json written only where a schema is referenced.
+- Terminal prose lines (recommendation, flags, reasons) wrap at 100 columns in the renderer; only table rows rely on column layout.
+- Phase 3 live gates, partial by request (local runs paused mid-session): sweep interrupted after the 27b OOM result and 19 qwen3:14b units; report rendered the partial journal honestly, bundle exported from it re-scored 19/19 outputs to identical values (verifyBundle 0 mismatches), python zipfile read the archive clean. Full-sweep skeptic-read gate and all VRAM gates remain; checklist in docs/local-verification.md under "Phase 3 report layer".
+- A bundle exported from a cwd where the run's relative packDir does not resolve omits scoring.json by design (the drift check cannot pass); observed live, worth knowing before exporting from outside the repo root.
+
 ## Deferred
 
 - Word-number parsing ("forty-two") for numeric-tolerance.

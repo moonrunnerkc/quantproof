@@ -65,6 +65,54 @@ node dist/cli/main.js run --pack examples/ticket-classification --limit 2 --mode
    one `nvidia-smi` snapshot taken mid-generation. That is enough to
    write the remaining decisions.md entries and mark gate 4 closed.
 
+## Phase 3 report layer: what remains after the 2026-07-16 session
+
+Everything code-side of phase 3 is done, tested (495 unit tests), and
+pushed: aggregation with spreads, Pareto frontier, recommendation,
+terminal comparison table, markdown report, bundle export with
+re-score verification, and the report / models / init commands, plus
+docs (methodology.md, task-packs.md, README skeleton).
+
+Verified live in the sandbox on 2026-07-16 (CPU-only Ollama 0.23.1):
+
+- Stranger path end to end minus inference: `init --yes` scaffolded a
+  pack, placeholders failed validation with the replace-me messages,
+  edited examples validated clean.
+- `models` listed the 5-model local ladder with predictions, excluded
+  the 4 cloud entries, and said plainly why every verdict is unknown
+  without nvidia-smi.
+- A live sweep was started and deliberately interrupted mid-candidate
+  (gemma3-27b OOM-classified as a result, qwen3:14b 19 units
+  journaled). `report` rendered the partial journal honestly, and
+  `report --bundle` exported a zip whose 19 raw outputs re-scored to
+  identical values from the bundle contents alone (verifyBundle: 0
+  mismatches). Python's zipfile independently read the archive with no
+  corrupt entries, so the in-repo zip writer interoperates.
+
+Still open, needs a machine with time on it (either box for the first
+two, the 5070 for anything involving VRAM columns):
+
+1. **Full uninterrupted sweep + skeptic read (phase 3 acceptance gate
+   2).** `node dist/cli/main.js run --pack examples/ticket-classification`
+   over the full local ladder, then `node dist/cli/main.js report
+   --markdown` and read the file top to bottom as a skeptical stranger
+   before calling it postable. The interrupted journal from 2026-07-16
+   is still in `.quantproof/results.db` on the dev sandbox; `resume`
+   will finish exactly the pending 4 candidates if run there.
+2. **Bundle gate at full scale (gate 3).** From the completed run:
+   `report --bundle`, then re-score check, e.g.
+   `node --input-type=module -e "import {readFileSync} from 'node:fs'; const {verifyBundle} = await import('./dist/results/bundle.js'); console.log(verifyBundle(readFileSync('<bundle.zip>')))"`.
+   Expect 0 mismatches.
+3. **Everything in the RTX 5070 section above**, unchanged, now with
+   the bonus that the markdown report renders the predicted-vs-measured
+   delta column that only exists once VRAM is measurable.
+
+Known content note for the eventual case study: qwen3 models score 0
+on ticket-classification because they spend the 16-token budget on
+`<think>` output instead of a bare label. That is an honest result
+(the pack demands a bare label), worth a sentence in the writeup, and
+a good example of what gate scorers surface.
+
 ## MacBook M5 64GB: useful, but not the gates
 
 quantproof v0.1 is NVIDIA-only (stated in the build plan; Apple Silicon
