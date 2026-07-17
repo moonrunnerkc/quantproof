@@ -1,17 +1,21 @@
 /**
- * Terminal table renderer: one candidate's measured results plus an
- * environment line. Pure string building so it is testable and the CLI
- * just prints it.
+ * Terminal table renderer: one table per candidate plus an environment
+ * line, and a sweep renderer that stacks them. Pure string building so
+ * it is testable and the CLI just prints it.
  */
 
 import type { RunSummary } from './aggregate.js';
 import type { CandidateRecord, RunRecord } from '../results/record-types.js';
+import type { SweepOutcome } from '../orchestrator/run-executor.js';
 import type { VramProbeResult } from '../telemetry/vram-probe.js';
 
 /** Everything the renderer needs for one candidate's table. */
 export interface ReportInput {
   readonly run: RunRecord;
   readonly candidate: CandidateRecord;
+  readonly status: 'completed' | 'failed' | 'oom';
+  readonly statusReason: string | null;
+  readonly offloadSuspectReason: string | null;
   readonly summary: RunSummary;
   readonly vram: VramProbeResult;
 }
@@ -34,11 +38,17 @@ function qualityLine(summary: RunSummary): string {
   return `${summary.meanScore.toFixed(3)} (${spread})`;
 }
 
-function vramLine(vram: VramProbeResult): string {
-  if (!vram.available) {
-    return `NOT MEASURED: ${vram.reason}`;
+function vramLine(input: ReportInput): string {
+  if (!input.vram.available) {
+    return `NOT MEASURED: ${input.vram.reason}`;
   }
-  return `${String(vram.peakMib)} MiB peak (${String(vram.samples.length)} samples)`;
+  const predicted = input.candidate.predictedPeakMib;
+  const measured = input.vram.peakMib;
+  const versus =
+    predicted === null
+      ? 'prediction unavailable'
+      : `predicted ${predicted.toFixed(0)} MiB, delta ${(((measured - predicted) / predicted) * 100).toFixed(1)}%`;
+  return `${String(measured)} MiB peak measured (${versus})`;
 }
 
 function determinismLine(summary: RunSummary): string {
@@ -51,41 +61,75 @@ function determinismLine(summary: RunSummary): string {
 }
 
 /**
- * Renders the result table for one candidate.
+ * Renders the result table for one candidate. Unmeasured VRAM, OOM,
+ * nondeterminism, and suspected partial offload all render loudly
+ * instead of disappearing into "n/a".
  *
- * @param input - Run, candidate, aggregated summary, and VRAM outcome.
- * @returns A multi-line string ready for stdout. Unmeasured VRAM and
- *   nondeterminism render loudly instead of disappearing into "n/a".
+ * @param input - Run, candidate, status, aggregated summary, and VRAM.
+ * @returns A multi-line string ready for stdout.
  */
 export function renderTerminalReport(input: ReportInput): string {
-  const { run, candidate, summary, vram } = input;
+  const { run, candidate, summary } = input;
   const lines: string[] = [];
   lines.push('');
   lines.push(`${run.packName} x ${candidate.modelName}`);
   lines.push('-'.repeat(60));
+  if (input.status === 'oom') {
+    lines.push(renderRow('result', `OOM at context ${String(run.generation.context)} (a result, not an error)`));
+    lines.push(renderRow('detail', input.statusReason ?? 'no detail recorded'));
+  } else if (input.status === 'failed') {
+    lines.push(renderRow('result', `FAILED: ${input.statusReason ?? 'no reason recorded'}`));
+  }
   lines.push(renderRow('quality (mean score)', qualityLine(summary)));
   lines.push(renderRow('pass rate', fmt(summary.passRate === null ? null : summary.passRate * 100, 1, '%')));
   lines.push(renderRow('ttft median', fmt(summary.ttftMedianMs, 0, ' ms')));
   lines.push(renderRow('tokens/sec median', fmt(summary.tokensPerSecondMedian, 1, '')));
-  lines.push(renderRow('peak vram', vramLine(vram)));
+  lines.push(renderRow('peak vram', vramLine(input)));
+  lines.push(renderRow('fit prediction', `${candidate.fitVerdict}${candidate.predictedPeakMib === null ? '' : `, predicted peak ${candidate.predictedPeakMib.toFixed(0)} MiB`}`));
+  if (input.offloadSuspectReason !== null) {
+    lines.push(renderRow('offload', `SUSPECTED CPU/GPU SPLIT: ${input.offloadSuspectReason}`));
+  }
   lines.push(renderRow('determinism', determinismLine(summary)));
   lines.push(
     renderRow(
       'units',
-      `${String(summary.completed)} completed, ${String(summary.failed)} failed, ${String(summary.pending)} pending`,
+      `${String(summary.completed)} completed, ${String(summary.failed)} failed, ` +
+        `${String(summary.pending)} pending, ${String(summary.skipped)} skipped`,
     ),
   );
   lines.push('-'.repeat(60));
-  const gpu = vram.available ? `${vram.gpu.name} (driver ${vram.gpu.driverVersion})` : 'gpu unknown';
+  const gpu = run.gpuName === null ? 'gpu unknown' : `${run.gpuName} (driver ${run.driverVersion ?? 'unknown'})`;
   lines.push(
     `  env: ${run.backendVersion} | ${candidate.modelName}@${candidate.digest.slice(0, 12)}` +
       ` | ${candidate.quantization ?? 'quant unknown'} | ${gpu}`,
   );
   lines.push(
-    `  repro: quantproof run --pack ${run.packDir} --model ${candidate.modelName}` +
+    `  repro: quantproof run --pack ${run.packDir}` +
       ` (seed ${String(run.generation.seed)}, temp ${String(run.generation.temperature)},` +
       ` ctx ${String(run.generation.context)}, ${String(run.generation.runs_per_example)} reps)`,
   );
   lines.push('');
   return lines.join('\n');
+}
+
+/**
+ * Renders a whole sweep: one table per candidate in execution order.
+ *
+ * @param outcome - The finished sweep.
+ * @returns Concatenated candidate tables.
+ */
+export function renderSweepReport(outcome: SweepOutcome): string {
+  return outcome.candidates
+    .map((candidate) =>
+      renderTerminalReport({
+        run: outcome.run,
+        candidate: candidate.candidate,
+        status: candidate.status,
+        statusReason: candidate.statusReason,
+        offloadSuspectReason: candidate.offloadSuspectReason,
+        summary: candidate.summary,
+        vram: candidate.vram,
+      }),
+    )
+    .join('');
 }

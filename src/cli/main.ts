@@ -6,6 +6,7 @@
  */
 
 import { Command } from 'commander';
+import { resumeCommand } from './command-resume.js';
 import { runCommand } from './command-run.js';
 import { registerBuiltinScorers } from '../scoring/builtin-scorers.js';
 import { listScorers } from '../scoring/scorer-registry.js';
@@ -45,14 +46,29 @@ program
 
 program
   .command('run')
-  .description('Run a task pack against one model and print the measured result table')
+  .description('Sweep candidate models over a task pack and print measured result tables')
   .requiredOption('--pack <dir>', 'task pack directory')
-  .requiredOption('--model <name>', 'model name as the backend knows it, e.g. gemma3:1b')
+  .option('--model <name>', 'run exactly one model, e.g. gemma3:1b')
+  .option('--config <file>', 'run config file listing candidate models')
+  .option('--force', 'attempt candidates predicted not to fit')
   .option('--db <path>', 'results database path', '.quantproof/results.db')
   .option('--limit <n>', 'run only the first N examples', (v) => Number.parseInt(v, 10))
-  .action(async (options: { pack: string; model: string; db: string; limit?: number }) => {
+  .action(async (options: { pack: string; model?: string; config?: string; force?: boolean; db: string; limit?: number }) => {
     try {
       await runCommand(options);
+    } catch (err) {
+      console.error(err instanceof Error ? err.message : String(err));
+      process.exitCode = 1;
+    }
+  });
+
+program
+  .command('resume')
+  .description('Resume the newest incomplete run from the journal')
+  .option('--db <path>', 'results database path', '.quantproof/results.db')
+  .action(async (options: { db: string }) => {
+    try {
+      await resumeCommand(options);
     } catch (err) {
       console.error(err instanceof Error ? err.message : String(err));
       process.exitCode = 1;

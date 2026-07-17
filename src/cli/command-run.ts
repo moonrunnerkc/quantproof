@@ -1,66 +1,122 @@
 /**
- * The run command: one task pack against one named model, ending in
- * the measured result table.
+ * The run command: plan a sweep (or a single explicit model), print
+ * the plan, execute it, and print the measured result tables.
  */
 
 import { OllamaAdapter } from '../backends/ollama-adapter.js';
-import { executeSingleModelRun } from '../orchestrator/run-executor.js';
-import { renderTerminalReport } from '../report/terminal-report.js';
+import type { ModelDescriptor } from '../backends/backend-adapter.js';
+import { DEFAULT_RUN_CONFIG, loadRunConfig } from '../catalog/run-config.js';
+import { resolveCandidates } from '../catalog/model-resolver.js';
+import { executeSweep, prepareSweepJournal } from '../orchestrator/run-executor.js';
+import { assessCandidates, buildRunPlan, renderRunPlan } from '../orchestrator/run-planner.js';
+import { configFingerprint, packFingerprint } from '../orchestrator/recovery.js';
+import { renderSweepReport } from '../report/terminal-report.js';
 import { RunStore } from '../results/run-store.js';
 import { registerBuiltinScorers } from '../scoring/builtin-scorers.js';
 import { listScorers } from '../scoring/scorer-registry.js';
 import { loadTaskPack } from '../tasks/task-loader.js';
+import type { LoadedTaskPack } from '../tasks/task-loader.js';
+import { queryGpuIdentity, queryVramOnce } from '../telemetry/vram-probe.js';
 
 /** Options parsed from the command line. */
 export interface RunCommandOptions {
-  /** Task pack directory. */
   readonly pack: string;
-  /** Backend model name, e.g. "gemma3:1b". */
-  readonly model: string;
-  /** Results database path; defaults to .quantproof/results.db. */
+  /** Run exactly this model instead of resolving a candidate set. */
+  readonly model?: string;
+  /** Run config file with explicit candidates. */
+  readonly config?: string;
+  /** Attempt candidates predicted not to fit. */
+  readonly force?: boolean;
   readonly db?: string;
-  /** Run only the first N examples (smoke tests, quick checks). */
+  /** Run only the first N examples. */
   readonly limit?: number;
-  /** Ollama base url override, mainly for tests. */
   readonly baseUrl?: string;
 }
 
+/** Applies --limit to a loaded pack. */
+export function limitPack(pack: LoadedTaskPack, limit: number | undefined): LoadedTaskPack {
+  if (limit === undefined) {
+    return pack;
+  }
+  if (limit < 1) {
+    throw new Error(`--limit ${String(limit)} leaves no examples to run; use a value of 1 or more`);
+  }
+  return { ...pack, examples: pack.examples.slice(0, limit) };
+}
+
 /**
- * Executes a single-model run and prints progress plus the final
- * table.
+ * Plans and executes a sweep, printing progress and the final tables.
  *
  * @param options - Parsed command options.
- * @returns The rendered report text (also printed), so tests can
- *   assert on it.
+ * @returns The rendered report text (also printed), for tests.
  * @throws TaskPackError on an invalid pack; backend errors when Ollama
- *   is unreachable or the model cannot be made available.
+ *   is unreachable; a plan error when nothing is left to run.
  */
 export async function runCommand(options: RunCommandOptions): Promise<string> {
   registerBuiltinScorers();
-  const loaded = loadTaskPack(options.pack, listScorers());
-  const pack =
-    options.limit === undefined
-      ? loaded
-      : { ...loaded, examples: loaded.examples.slice(0, options.limit) };
-  if (pack.examples.length === 0) {
-    throw new Error(`--limit ${String(options.limit)} leaves no examples to run; use a value of 1 or more`);
+  const pack = limitPack(loadTaskPack(options.pack, listScorers()), options.limit);
+  const adapter = new OllamaAdapter(options.baseUrl);
+  const backendVersion = await adapter.version();
+
+  let descriptors: readonly ModelDescriptor[];
+  if (options.model !== undefined) {
+    descriptors = [await adapter.ensureModelAvailable(options.model)];
+  } else {
+    const config = options.config === undefined ? DEFAULT_RUN_CONFIG : loadRunConfig(options.config);
+    const resolved = await resolveCandidates(adapter, config);
+    for (const excluded of resolved.excluded) {
+      console.log(`  excluded ${excluded.name}: ${excluded.reason}`);
+    }
+    descriptors = resolved.candidates;
+  }
+  if (descriptors.length === 0) {
+    throw new Error(
+      'no candidates to run; pull a model (ollama pull gemma3:1b), pass --model, or list candidates in a --config file',
+    );
   }
 
-  const adapter = new OllamaAdapter(options.baseUrl);
+  const gpu = queryGpuIdentity();
+  const freeVramMib = queryVramOnce()?.freeMib ?? null;
+  const assessments = await assessCandidates(adapter, descriptors, pack.manifest.generation.context, freeVramMib);
+  // An explicitly named model is always attempted: naming it is the override.
+  const force = (options.force ?? false) || options.model !== undefined;
+  const plan = buildRunPlan(assessments, {
+    force,
+    unitsPerCandidate: pack.examples.length * pack.manifest.generation.runs_per_example,
+    maxTokens: pack.manifest.generation.max_tokens,
+  });
+  console.log(renderRunPlan(plan, pack.manifest.name));
+  if (plan.included.length === 0) {
+    throw new Error('every candidate was predicted not to fit; rerun with --force to attempt them anyway');
+  }
+
   const store = RunStore.open(options.db ?? '.quantproof/results.db');
   try {
-    console.log(
-      `running ${pack.manifest.name} (${String(pack.examples.length)} examples x ` +
-        `${String(pack.manifest.generation.runs_per_example)} reps) against ${options.model}`,
+    const prepared = prepareSweepJournal(
+      store, pack, options.pack, plan,
+      {
+        explicitModel: options.model ?? null,
+        configPath: options.config ?? null,
+        configFingerprint: configFingerprint(options.config ?? null),
+        packFingerprint: packFingerprint(options.pack),
+        limit: options.limit ?? null,
+        force,
+      },
+      {
+        backendVersion,
+        gpu,
+        vramUnavailableReason:
+          gpu === null ? 'nvidia-smi is not available on this machine, so VRAM was not measured' : null,
+      },
     );
-    const outcome = await executeSingleModelRun(pack, options.pack, options.model, {
+    const outcome = await executeSweep(pack, prepared, {
       adapter,
       store,
       onProgress: (line) => {
         console.log(`  ${line}`);
       },
     });
-    const report = renderTerminalReport(outcome);
+    const report = renderSweepReport(outcome);
     console.log(report);
     return report;
   } finally {

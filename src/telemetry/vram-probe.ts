@@ -79,8 +79,14 @@ export function queryVramOnce(binary = 'nvidia-smi'): VramSnapshot | null {
   return { freeMib, usedMib };
 }
 
-/** Queries GPU identity once. Returns null when the binary is unusable. */
-function queryGpuInfo(binary: string): GpuInfo | null {
+/**
+ * Queries GPU identity once (name, driver, total memory).
+ *
+ * @param binary - nvidia-smi or a test fake.
+ * @returns The identity, or null when the binary is missing or its
+ *   output is unparseable. Never throws.
+ */
+export function queryGpuIdentity(binary = 'nvidia-smi'): GpuInfo | null {
   const probe = spawnSync(binary, ['--query-gpu=name,driver_version,memory.total', '--format=csv,noheader,nounits'], {
     encoding: 'utf8',
     timeout: 5000,
@@ -113,7 +119,7 @@ export function startVramProbe(options: VramProbeOptions = {}): VramProbe {
   const binary = options.binary ?? 'nvidia-smi';
   const intervalMs = options.intervalMs ?? 200;
 
-  const gpu = queryGpuInfo(binary);
+  const gpu = queryGpuIdentity(binary);
   if (gpu === null) {
     const reason = `${binary} is not available on this machine, so VRAM was not measured`;
     return {
