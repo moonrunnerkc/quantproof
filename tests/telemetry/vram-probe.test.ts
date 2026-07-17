@@ -23,8 +23,18 @@ const INFO_BRANCH = `if [[ "$1" == *name* ]]; then
 fi`;
 
 describe('startVramProbe', () => {
+  it('exposes gpu identity at start so the run record can carry it', () => {
+    const binary = fakeSmi('identity-smi', `${INFO_BRANCH}\nsleep 60`);
+    const probe = startVramProbe({ binary, intervalMs: 20 });
+    expect(probe.gpu?.name).toBe('NVIDIA GeForce RTX 5070');
+    expect(probe.unavailableReason).toBeNull();
+    return probe.stop();
+  });
+
   it('reports unavailable with the reason when the binary does not exist', async () => {
     const probe = startVramProbe({ binary: join(dir, 'no-such-nvidia-smi') });
+    expect(probe.gpu).toBeNull();
+    expect(probe.unavailableReason).toContain('not available');
     const result = await probe.stop();
     expect(result.available).toBe(false);
     if (!result.available) {

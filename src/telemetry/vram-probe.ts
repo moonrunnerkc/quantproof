@@ -36,6 +36,10 @@ export type VramProbeResult =
 
 /** A running probe; stop() ends sampling and returns the result. */
 export interface VramProbe {
+  /** GPU identity, known at start; null when the probe is unavailable. */
+  readonly gpu: GpuInfo | null;
+  /** Why the probe is unavailable; null when it is running. */
+  readonly unavailableReason: string | null;
   stop(): Promise<VramProbeResult>;
 }
 
@@ -82,12 +86,11 @@ export function startVramProbe(options: VramProbeOptions = {}): VramProbe {
 
   const gpu = queryGpuInfo(binary);
   if (gpu === null) {
+    const reason = `${binary} is not available on this machine, so VRAM was not measured`;
     return {
-      stop: () =>
-        Promise.resolve({
-          available: false,
-          reason: `${binary} is not available on this machine, so VRAM was not measured`,
-        }),
+      gpu: null,
+      unavailableReason: reason,
+      stop: () => Promise.resolve({ available: false, reason }),
     };
   }
 
@@ -98,7 +101,7 @@ export function startVramProbe(options: VramProbeOptions = {}): VramProbe {
     });
   } catch (err) {
     const reason = `failed to start ${binary}: ${err instanceof Error ? err.message : String(err)}`;
-    return { stop: () => Promise.resolve({ available: false, reason }) };
+    return { gpu: null, unavailableReason: reason, stop: () => Promise.resolve({ available: false, reason }) };
   }
 
   const samples: VramSample[] = [];
@@ -121,6 +124,8 @@ export function startVramProbe(options: VramProbeOptions = {}): VramProbe {
   });
 
   return {
+    gpu,
+    unavailableReason: null,
     stop: () =>
       new Promise<VramProbeResult>((resolvePromise) => {
         const finish = (): void => {
