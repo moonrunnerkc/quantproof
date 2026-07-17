@@ -4,6 +4,20 @@
   "description": "Runs your real task examples against local quantized models via Ollama and recommends the smallest quant that holds quality.",
   "license": "MIT",
   "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/moonrunnerkc/quantproof.git"
+  },
+  "homepage": "https://github.com/moonrunnerkc/quantproof#readme",
+  "bugs": "https://github.com/moonrunnerkc/quantproof/issues",
+  "keywords": [
+    "llm",
+    "evaluation",
+    "quantization",
+    "ollama",
+    "local-llm",
+    "cli"
+  ],
   "engines": {
     "node": ">=22"
   },
@@ -15,6 +29,7 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
+    "prepack": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "test": "vitest run",
