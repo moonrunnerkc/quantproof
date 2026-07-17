@@ -19,6 +19,7 @@ describe('loadRunConfig', () => {
   it('loads candidates and use_local_models', () => {
     const path = configFile('full.yaml', 'candidates:\n  - gemma3:1b\n  - qwen3:4b\nuse_local_models: false\n');
     expect(loadRunConfig(path)).toEqual({
+      backend: 'ollama',
       candidates: ['gemma3:1b', 'qwen3:4b'],
       useLocalModels: false,
     });
@@ -26,11 +27,35 @@ describe('loadRunConfig', () => {
 
   it('defaults candidates to empty and use_local_models to true', () => {
     const path = configFile('minimal.yaml', 'candidates: []\n');
-    expect(loadRunConfig(path)).toEqual({ candidates: [], useLocalModels: true });
+    expect(loadRunConfig(path)).toEqual({ backend: 'ollama', candidates: [], useLocalModels: true });
   });
 
   it('matches the documented default when no config file is used', () => {
-    expect(DEFAULT_RUN_CONFIG).toEqual({ candidates: [], useLocalModels: true });
+    expect(DEFAULT_RUN_CONFIG).toEqual({ backend: 'ollama', candidates: [], useLocalModels: true });
+  });
+
+  it('loads an anthropic backend config with explicit candidates', () => {
+    const path = configFile('api.yaml', 'backend: anthropic\ncandidates:\n  - claude-haiku-4-5\n');
+    expect(loadRunConfig(path)).toEqual({
+      backend: 'anthropic',
+      candidates: ['claude-haiku-4-5'],
+      useLocalModels: false,
+    });
+  });
+
+  it('rejects an unknown backend naming the valid options', () => {
+    const path = configFile('bad-backend.yaml', 'backend: openai\ncandidates: [x]\n');
+    expect(() => loadRunConfig(path)).toThrow(/"backend" must be "ollama" or "anthropic"/);
+  });
+
+  it('rejects use_local_models on the anthropic backend with an example fix', () => {
+    const path = configFile('api-local.yaml', 'backend: anthropic\nuse_local_models: true\ncandidates: [claude-haiku-4-5]\n');
+    expect(() => loadRunConfig(path)).toThrow(/only applies to the ollama backend/);
+  });
+
+  it('rejects an anthropic backend without candidates, showing the shape', () => {
+    const path = configFile('api-empty.yaml', 'backend: anthropic\n');
+    expect(() => loadRunConfig(path)).toThrow(/needs an explicit candidates list.*claude-haiku-4-5/);
   });
 
   it('rejects a missing file pointing at --config', () => {

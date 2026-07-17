@@ -1,18 +1,25 @@
 /**
- * Run config file: the explicit candidate list for a sweep. Shape is
- * deliberately minimal (documented in docs/run-config.md):
+ * Run config file: the backend and explicit candidate list for a
+ * sweep. Shape is deliberately minimal (documented in
+ * docs/run-config.md):
  *
+ *   backend: ollama        # or "anthropic" for the API backend
  *   candidates:            # models to evaluate, pulled on demand
  *     - gemma3:1b
  *     - qwen3:4b
- *   use_local_models: true # also include everything already pulled
+ *   use_local_models: true # ollama only: include everything pulled
  */
 
 import { readFileSync } from 'node:fs';
 import { parse as parseYaml } from 'yaml';
 
+/** Which adapter a sweep runs against. */
+export type BackendKind = 'ollama' | 'anthropic';
+
 /** A validated run config. */
 export interface RunConfig {
+  /** Backend the sweep runs against. */
+  readonly backend: BackendKind;
   /** Explicit candidate model names, in declared order. */
   readonly candidates: readonly string[];
   /** Whether to merge in every model already in the local store. */
@@ -20,7 +27,11 @@ export interface RunConfig {
 }
 
 /** The default when no config file is given: sweep the local store. */
-export const DEFAULT_RUN_CONFIG: RunConfig = { candidates: [], useLocalModels: true };
+export const DEFAULT_RUN_CONFIG: RunConfig = {
+  backend: 'ollama',
+  candidates: [],
+  useLocalModels: true,
+};
 
 /**
  * Loads and validates a run config file.
@@ -54,6 +65,13 @@ export function loadRunConfig(path: string): RunConfig {
   }
   const record = doc as Record<string, unknown>;
 
+  const backendRaw = record['backend'] ?? 'ollama';
+  if (backendRaw !== 'ollama' && backendRaw !== 'anthropic') {
+    throw new Error(
+      `${path}: "backend" must be "ollama" or "anthropic", got ${JSON.stringify(backendRaw)}`,
+    );
+  }
+
   const candidatesRaw = record['candidates'] ?? [];
   if (
     !Array.isArray(candidatesRaw) ||
@@ -62,18 +80,28 @@ export function loadRunConfig(path: string): RunConfig {
     throw new Error(`${path}: "candidates" must be a list of model names like "gemma3:1b"; fix it and rerun`);
   }
 
-  const useLocalRaw = record['use_local_models'] ?? true;
+  const useLocalRaw = record['use_local_models'] ?? (backendRaw === 'ollama');
   if (typeof useLocalRaw !== 'boolean') {
     throw new Error(`${path}: "use_local_models" must be true or false`);
   }
-
-  const known = new Set(['candidates', 'use_local_models']);
-  const unknown = Object.keys(record).filter((k) => !known.has(k));
-  if (unknown.length > 0) {
+  if (backendRaw === 'anthropic' && useLocalRaw) {
     throw new Error(
-      `${path}: unknown key${unknown.length === 1 ? '' : 's'} ${unknown.map((k) => `"${k}"`).join(', ')}; the run config accepts only "candidates" and "use_local_models"`,
+      `${path}: "use_local_models" only applies to the ollama backend; the anthropic backend needs an explicit candidates list, e.g. candidates: [claude-haiku-4-5, claude-sonnet-4-5]`,
+    );
+  }
+  if (backendRaw === 'anthropic' && candidatesRaw.length === 0) {
+    throw new Error(
+      `${path}: the anthropic backend needs an explicit candidates list of model ids, e.g. candidates: [claude-haiku-4-5, claude-sonnet-4-5]`,
     );
   }
 
-  return { candidates: candidatesRaw, useLocalModels: useLocalRaw };
+  const known = new Set(['backend', 'candidates', 'use_local_models']);
+  const unknown = Object.keys(record).filter((k) => !known.has(k));
+  if (unknown.length > 0) {
+    throw new Error(
+      `${path}: unknown key${unknown.length === 1 ? '' : 's'} ${unknown.map((k) => `"${k}"`).join(', ')}; the run config accepts only "backend", "candidates", and "use_local_models"`,
+    );
+  }
+
+  return { backend: backendRaw, candidates: candidatesRaw, useLocalModels: useLocalRaw };
 }

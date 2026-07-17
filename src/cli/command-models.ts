@@ -5,8 +5,10 @@
  * context length, so users can sanity-check the ladder first.
  */
 
+import { AnthropicAdapter } from '../backends/anthropic-adapter.js';
 import { OllamaAdapter } from '../backends/ollama-adapter.js';
 import type { BackendAdapter } from '../backends/backend-adapter.js';
+import type { BackendKind } from '../catalog/run-config.js';
 import { DEFAULT_RUN_CONFIG, loadRunConfig } from '../catalog/run-config.js';
 import type { ModelInfoSource } from '../catalog/gguf-metadata.js';
 import { resolveCandidates } from '../catalog/model-resolver.js';
@@ -20,12 +22,31 @@ export interface ModelsCommandOptions {
   readonly config?: string;
   /** Context length for the fit prediction; default 4096. */
   readonly context?: number;
+  /** Backend to list; default ollama. */
+  readonly backend?: BackendKind;
   readonly baseUrl?: string;
   /** Injectable backend, for tests; defaults to the Ollama adapter. */
   readonly adapter?: BackendAdapter & ModelInfoSource;
 }
 
 const DEFAULT_PREVIEW_CONTEXT = 4096;
+
+async function listAnthropicModels(baseUrl?: string): Promise<string> {
+  const adapter = new AnthropicAdapter(baseUrl);
+  const backendVersion = await adapter.version();
+  const models = await adapter.listModels();
+  const lines = [
+    `${String(models.length)} model${models.length === 1 ? '' : 's'} | ${backendVersion}`,
+    'inference runs on Anthropic hardware; local fit and VRAM do not apply to this backend',
+    '',
+    ...models.map((m) => `  ${m.name}`),
+    '',
+    'sweep them by listing ids in a config file: backend: anthropic, candidates: [<id>, ...]',
+  ];
+  const text = lines.join('\n');
+  console.log(text);
+  return text;
+}
 
 /**
  * Lists candidates with fit predictions.
@@ -36,6 +57,9 @@ const DEFAULT_PREVIEW_CONTEXT = 4096;
  *   invalid; both errors carry the fix.
  */
 export async function modelsCommand(options: ModelsCommandOptions): Promise<string> {
+  if (options.backend === 'anthropic') {
+    return listAnthropicModels(options.baseUrl);
+  }
   const adapter = options.adapter ?? new OllamaAdapter(options.baseUrl);
   const backendVersion = await adapter.version();
   const config = options.config === undefined ? DEFAULT_RUN_CONFIG : loadRunConfig(options.config);

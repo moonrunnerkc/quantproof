@@ -41,22 +41,38 @@ export type Recommendation =
     };
 
 const quality = (aggregate: CandidateAggregate): number => aggregate.summary.meanScore ?? 0;
+const rate = (aggregate: CandidateAggregate): number => aggregate.summary.tokensPerSecondMedian ?? 0;
 
-/** Footprint used to order picks: measured VRAM, or weights as fallback. */
+/**
+ * How picks are ordered: measured VRAM, weights on disk as the proxy
+ * when VRAM was unmeasured, or none at all for API backends (no local
+ * footprint exists, so ranking uses quality and latency only).
+ */
 interface Footprint {
+  readonly kind: 'vram' | 'weights' | 'none';
   readonly mib: (aggregate: CandidateAggregate) => number;
-  readonly measured: boolean;
 }
 
 function footprintFor(withinTolerance: readonly CandidateAggregate[]): Footprint {
-  const allMeasured = withinTolerance.every((a) => a.measuredPeakMib !== null);
-  return allMeasured
-    ? { mib: (a) => a.measuredPeakMib ?? Number.POSITIVE_INFINITY, measured: true }
-    : { mib: (a) => a.candidate.sizeBytes / MIB, measured: false };
+  if (withinTolerance.every((a) => a.measuredPeakMib !== null)) {
+    return { kind: 'vram', mib: (a) => a.measuredPeakMib ?? Number.POSITIVE_INFINITY };
+  }
+  if (withinTolerance.every((a) => a.candidate.sizeBytes === 0)) {
+    return { kind: 'none', mib: () => 0 };
+  }
+  return { kind: 'weights', mib: (a) => a.candidate.sizeBytes / MIB };
 }
 
 function pickSmallest(withinTolerance: readonly CandidateAggregate[], footprint: Footprint): CandidateAggregate {
   return [...withinTolerance].sort((a, b) => {
+    if (footprint.kind === 'none') {
+      const byQuality = quality(b) - quality(a);
+      if (byQuality !== 0) {
+        return byQuality;
+      }
+      const byRate = rate(b) - rate(a);
+      return byRate !== 0 ? byRate : a.candidate.modelName.localeCompare(b.candidate.modelName);
+    }
     const byFootprint = footprint.mib(a) - footprint.mib(b);
     if (byFootprint !== 0) {
       return byFootprint;
@@ -65,7 +81,7 @@ function pickSmallest(withinTolerance: readonly CandidateAggregate[], footprint:
     if (byQuality !== 0) {
       return byQuality;
     }
-    const byRate = (b.summary.tokensPerSecondMedian ?? 0) - (a.summary.tokensPerSecondMedian ?? 0);
+    const byRate = rate(b) - rate(a);
     return byRate !== 0 ? byRate : a.candidate.modelName.localeCompare(b.candidate.modelName);
   })[0] as CandidateAggregate;
 }
@@ -76,9 +92,16 @@ function pickReason(
   tolerance: number,
   footprint: Footprint,
 ): string {
-  const size = footprint.measured
-    ? `${footprint.mib(pick).toFixed(0)} MiB peak VRAM`
-    : `${footprint.mib(pick).toFixed(0)} MiB weights on disk (peak VRAM was not measured on this run)`;
+  if (footprint.kind === 'none') {
+    return (
+      `${pick.candidate.modelName} has the best measured quality (${quality(pick).toFixed(3)}) at ${rate(pick).toFixed(1)} tok/s ` +
+      'among gate-passing candidates; this is an API backend run, so the ranking uses quality and latency only (no local footprint applies).'
+    );
+  }
+  const size =
+    footprint.kind === 'vram'
+      ? `${footprint.mib(pick).toFixed(0)} MiB peak VRAM`
+      : `${footprint.mib(pick).toFixed(0)} MiB weights on disk (peak VRAM was not measured on this run)`;
   if (pick === best) {
     return `${pick.candidate.modelName} has both the best measured quality (${quality(pick).toFixed(3)}) and the smallest footprint (${size}) among gate-passing candidates.`;
   }
@@ -103,11 +126,14 @@ function runnerUpReason(
     const dropPercent = ((quality(best) - quality(aggregate)) / quality(best)) * 100;
     return `quality ${quality(aggregate).toFixed(3)} is ${dropPercent.toFixed(1)}% below the best ${quality(best).toFixed(3)}, outside the tolerance`;
   }
+  if (footprint.kind === 'none') {
+    return `same quality band but ${rate(aggregate).toFixed(1)} tok/s median versus ${rate(pick).toFixed(1)} for ${pick.candidate.modelName}`;
+  }
   const extra = footprint.mib(aggregate) - footprint.mib(pick);
   if (extra === 0) {
     return `identical footprint to ${pick.candidate.modelName}; lost the tie-break on quality, then throughput`;
   }
-  const unit = footprint.measured ? 'MiB more peak VRAM' : 'MiB more weights';
+  const unit = footprint.kind === 'vram' ? 'MiB more peak VRAM' : 'MiB more weights';
   return `same quality band but ${extra.toFixed(0)} ${unit} than ${pick.candidate.modelName}`;
 }
 

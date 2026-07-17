@@ -57,7 +57,7 @@ function determinismLine(summary: RunSummary): string {
   }
   return summary.outputsDeterministic
     ? 'outputs identical across repetitions'
-    : 'NONDETERMINISTIC: outputs differ across repetitions despite fixed seed';
+    : 'NONDETERMINISTIC: outputs differ across repetitions for identical requests';
 }
 
 /**

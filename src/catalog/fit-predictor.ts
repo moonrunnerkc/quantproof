@@ -19,7 +19,7 @@ const FREE_VRAM_HEADROOM = 0.95;
 
 /** Per-candidate fit verdict with its arithmetic. */
 export interface FitPrediction {
-  readonly verdict: 'fits' | 'does-not-fit' | 'unknown';
+  readonly verdict: 'fits' | 'does-not-fit' | 'unknown' | 'not-applicable';
   /** One sentence explaining the verdict. */
   readonly reason: string;
   /** Weights + KV + overhead; null when architecture is unknown. */
@@ -30,6 +30,24 @@ export interface FitPrediction {
   readonly overheadMib: number;
   /** Free VRAM sampled at plan time; null when unmeasurable. */
   readonly freeVramMib: number | null;
+}
+
+/**
+ * The fit verdict for API-backend candidates: inference runs on the
+ * provider's hardware, so local fit is not a question, not an unknown.
+ *
+ * @returns A prediction whose verdict is "not-applicable".
+ */
+export function notApplicableFit(): FitPrediction {
+  return {
+    verdict: 'not-applicable',
+    reason: 'API backend: inference runs on Anthropic hardware, so local fit does not apply',
+    predictedPeakMib: null,
+    weightsMib: 0,
+    kvCacheMib: null,
+    overheadMib: 0,
+    freeVramMib: null,
+  };
 }
 
 /**

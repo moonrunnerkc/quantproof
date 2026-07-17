@@ -4,10 +4,11 @@
  * original plan and config exactly.
  */
 
-import { OllamaAdapter } from '../backends/ollama-adapter.js';
+import { apiNoopProbe, backendKindOf, createAdapter } from '../backends/backend-select.js';
 import { buildResume, findResumableRun, verifyNoDrift } from '../orchestrator/recovery.js';
 import { executeSweep } from '../orchestrator/run-executor.js';
-import { renderComparison } from '../report/comparison-table.js';
+import type { SweepOptions } from '../orchestrator/run-executor.js';
+import { renderComparison, renderTokenSpend } from '../report/comparison-table.js';
 import { buildReportData } from '../report/report-data.js';
 import { renderSweepReport } from '../report/terminal-report.js';
 import { RunStore } from '../results/run-store.js';
@@ -59,15 +60,19 @@ export async function resumeCommand(options: ResumeCommandOptions): Promise<stri
         `resuming run ${run.id} (${run.packName}): ${String(prepared.entries.length)} candidate${prepared.entries.length === 1 ? '' : 's'} with ` +
           `${String(prepared.entries.reduce((n, e) => n + e.units.length, 0))} pending units`,
       );
-      const outcome = await executeSweep(pack, prepared, {
-        adapter: new OllamaAdapter(options.baseUrl),
+      const kind = backendKindOf(run.backendVersion);
+      const sweepOptions: SweepOptions = {
+        adapter: createAdapter(kind, options.baseUrl),
         store,
         onProgress: (line) => {
           console.log(`  ${line}`);
         },
-      });
-      const data = buildReportData(run, store.listCandidates(run.id), store.listUnitResults(run.id));
-      const report = renderSweepReport(outcome) + renderComparison(data);
+        ...(kind === 'anthropic' ? { startProbe: apiNoopProbe, sampleVram: () => null, cooldownMs: 0 } : {}),
+      };
+      const outcome = await executeSweep(pack, prepared, sweepOptions);
+      const units = store.listUnitResults(run.id);
+      const data = buildReportData(run, store.listCandidates(run.id), units);
+      const report = renderSweepReport(outcome) + renderComparison(data) + renderTokenSpend(units);
       console.log(report);
       return report;
     } finally {

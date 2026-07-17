@@ -6,6 +6,7 @@
  */
 
 import type { CandidateAggregate } from './aggregate.js';
+import type { UnitResult } from '../results/record-types.js';
 import {
   fmtMib, fmtMs, fmtRate, fmtScore, fmtSignedPercent, fmtWithSpread, renderColumns, wrapLine,
 } from './format.js';
@@ -43,7 +44,7 @@ function flagsFor(aggregate: CandidateAggregate): Flag[] {
   if (aggregate.summary.outputsDeterministic === false) {
     flags.push({
       token: 'nondet',
-      detail: 'outputs differ across repetitions despite the fixed seed',
+      detail: 'outputs differ across repetitions; the backend did not produce repeatable output for identical requests',
     });
   }
   return flags;
@@ -52,11 +53,13 @@ function flagsFor(aggregate: CandidateAggregate): Flag[] {
 function row(aggregate: CandidateAggregate, flags: readonly Flag[]): string[] {
   const s = aggregate.summary;
   const vram =
-    aggregate.measuredPeakMib === null
-      ? 'n/m'
-      : aggregate.vramDeltaPercent === null
-        ? fmtMib(aggregate.measuredPeakMib)
-        : `${fmtMib(aggregate.measuredPeakMib)} (${fmtSignedPercent(aggregate.vramDeltaPercent)}%)`;
+    aggregate.candidate.fitVerdict === 'not-applicable'
+      ? 'n/a'
+      : aggregate.measuredPeakMib === null
+        ? 'n/m'
+        : aggregate.vramDeltaPercent === null
+          ? fmtMib(aggregate.measuredPeakMib)
+          : `${fmtMib(aggregate.measuredPeakMib)} (${fmtSignedPercent(aggregate.vramDeltaPercent)}%)`;
   return [
     aggregate.candidate.modelName,
     aggregate.candidate.quantization ?? '?',
@@ -85,6 +88,24 @@ function recommendationLines(data: ReportData): string[] {
       wrapLine(`  runner-up ${runner.aggregate.candidate.modelName}: ${runner.reason}`),
     ),
   ];
+}
+
+/**
+ * One line totaling the run's token spend from the backend's own
+ * counts, printed at the end of a sweep.
+ *
+ * @param units - The run's unit results.
+ * @returns The line, or an empty string when no generation reported
+ *   token counts.
+ */
+export function renderTokenSpend(units: readonly UnitResult[]): string {
+  const counted = units.filter((u) => u.generation !== null);
+  if (counted.length === 0) {
+    return '';
+  }
+  const prompt = counted.reduce((n, u) => n + (u.generation?.promptTokenCount ?? 0), 0);
+  const output = counted.reduce((n, u) => n + (u.generation?.outputTokenCount ?? 0), 0);
+  return `token spend: ${String(prompt)} prompt + ${String(output)} output tokens across ${String(counted.length)} generations\n`;
 }
 
 /**

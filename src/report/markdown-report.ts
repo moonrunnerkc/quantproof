@@ -9,6 +9,7 @@
 import type { CandidateAggregate } from './aggregate.js';
 import { fmtMib, fmtMs, fmtRate, fmtScore, fmtSignedPercent, fmtWithSpread } from './format.js';
 import type { ReportData } from './report-data.js';
+import { isApiBackend } from '../backends/backend-select.js';
 import type { RunRecord } from '../results/record-types.js';
 
 /**
@@ -65,7 +66,7 @@ function footnotesFor(aggregates: readonly CandidateAggregate[]): Map<CandidateA
       own.push({ marker: marker(), text: `${aggregate.candidate.modelName}: suspected CPU/GPU split, ${aggregate.offloadSuspectReason}` });
     }
     if (aggregate.summary.outputsDeterministic === false) {
-      own.push({ marker: marker(), text: `${aggregate.candidate.modelName}: outputs differed across repetitions despite the fixed seed` });
+      own.push({ marker: marker(), text: `${aggregate.candidate.modelName}: outputs differed across repetitions; the backend did not produce repeatable output for identical requests` });
     }
     notes.set(aggregate, own);
   }
@@ -78,9 +79,14 @@ function resultsRow(aggregate: CandidateAggregate, footnotes: readonly Footnote[
   const pass = s.passRate === null ? '-' : `${(s.passRate * 100).toFixed(1)}%`;
   const ttft = fmtWithSpread(s.ttftMedianMs, s.ttftSpreadMs, fmtMs);
   const rate = fmtWithSpread(s.tokensPerSecondMedian, s.tokensPerSecondSpread, fmtRate);
-  const vram = aggregate.measuredPeakMib === null ? 'not measured' : fmtMib(aggregate.measuredPeakMib);
+  const apiCandidate = aggregate.candidate.fitVerdict === 'not-applicable';
+  const vram = apiCandidate
+    ? 'not applicable'
+    : aggregate.measuredPeakMib === null
+      ? 'not measured'
+      : fmtMib(aggregate.measuredPeakMib);
   const predicted =
-    aggregate.predictedPeakMib === null
+    apiCandidate || aggregate.predictedPeakMib === null
       ? '-'
       : `${fmtMib(aggregate.predictedPeakMib)}${aggregate.vramDeltaPercent === null ? '' : ` (${fmtSignedPercent(aggregate.vramDeltaPercent)}%)`}`;
   const markers = footnotes.map((f) => f.marker).join(' ');
@@ -107,7 +113,7 @@ function environmentSection(run: RunRecord, aggregates: readonly CandidateAggreg
     '| --- | --- | --- | ---: | --- |',
     ...aggregates.map(
       (a) =>
-        `| ${a.candidate.modelName} | ${a.candidate.quantization ?? '?'} | ${a.candidate.parameterSize ?? '?'} | ${fmtMib(a.candidate.sizeBytes / (1024 * 1024))} | \`${a.candidate.digest.slice(0, 12)}\` |`,
+        `| ${a.candidate.modelName} | ${a.candidate.quantization ?? '-'} | ${a.candidate.parameterSize ?? '-'} | ${a.candidate.sizeBytes === 0 ? '-' : fmtMib(a.candidate.sizeBytes / (1024 * 1024))} | \`${a.candidate.digest.slice(0, 12)}\` |`,
     ),
   ];
 }
@@ -164,10 +170,15 @@ export function renderMarkdownReport(data: ReportData): string {
   const { run } = data;
   const footnotes = footnotesFor(data.aggregates);
   const allNotes = [...footnotes.values()].flat();
+  const api = isApiBackend(run.backendVersion);
   const lines: string[] = [
-    `# quantproof: ${run.packName} on ${run.gpuName ?? 'CPU (no GPU telemetry)'}`,
+    api
+      ? `# quantproof: ${run.packName} via the Anthropic API`
+      : `# quantproof: ${run.packName} on ${run.gpuName ?? 'CPU (no GPU telemetry)'}`,
     '',
-    `Measured results of running the ${run.packName} task pack against ${String(data.aggregates.length)} local model${data.aggregates.length === 1 ? '' : 's'} via ${run.backendVersion}. Scores are deterministic (scorer: ${run.scorerName}); no numbers below are estimates unless labeled as predictions.`,
+    api
+      ? `Measured results of running the ${run.packName} task pack against ${String(data.aggregates.length)} Claude model${data.aggregates.length === 1 ? '' : 's'} over ${run.backendVersion}. Inference ran on Anthropic hardware: no local GPU, VRAM, or model files were involved, so this table is not comparable to a local-model measurement. Scores are deterministic (scorer: ${run.scorerName}).`
+      : `Measured results of running the ${run.packName} task pack against ${String(data.aggregates.length)} local model${data.aggregates.length === 1 ? '' : 's'} via ${run.backendVersion}. Scores are deterministic (scorer: ${run.scorerName}); no numbers below are estimates unless labeled as predictions.`,
     '',
     ...data.notes.map((note) => `> Note: ${note}`),
     ...(data.notes.length > 0 ? [''] : []),

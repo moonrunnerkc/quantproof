@@ -5,12 +5,17 @@
 
 import { OllamaAdapter } from '../backends/ollama-adapter.js';
 import type { ModelDescriptor } from '../backends/backend-adapter.js';
+import {
+  API_BACKEND_VRAM_REASON, apiNoopProbe, createAdapter,
+} from '../backends/backend-select.js';
 import { DEFAULT_RUN_CONFIG, loadRunConfig } from '../catalog/run-config.js';
+import { notApplicableFit } from '../catalog/fit-predictor.js';
 import { resolveCandidates } from '../catalog/model-resolver.js';
 import { executeSweep, prepareSweepJournal } from '../orchestrator/run-executor.js';
+import type { SweepOptions } from '../orchestrator/run-executor.js';
 import { assessCandidates, buildRunPlan, renderRunPlan } from '../orchestrator/run-planner.js';
 import { configFingerprint, packFingerprint } from '../orchestrator/recovery.js';
-import { renderComparison } from '../report/comparison-table.js';
+import { renderComparison, renderTokenSpend } from '../report/comparison-table.js';
 import { buildReportData } from '../report/report-data.js';
 import { renderSweepReport } from '../report/terminal-report.js';
 import { withSweepGuards } from './sweep-guards.js';
@@ -63,14 +68,15 @@ export async function runCommand(options: RunCommandOptions): Promise<string> {
   if (authoringProblems.length > 0) {
     throw new TaskPackError(options.pack, authoringProblems);
   }
-  const adapter = new OllamaAdapter(options.baseUrl);
+  const config = options.config === undefined ? DEFAULT_RUN_CONFIG : loadRunConfig(options.config);
+  const adapter =
+    config.backend === 'ollama' ? new OllamaAdapter(options.baseUrl) : createAdapter(config.backend, options.baseUrl);
   const backendVersion = await adapter.version();
 
   let descriptors: readonly ModelDescriptor[];
   if (options.model !== undefined) {
     descriptors = [await adapter.ensureModelAvailable(options.model)];
   } else {
-    const config = options.config === undefined ? DEFAULT_RUN_CONFIG : loadRunConfig(options.config);
     const resolved = await resolveCandidates(adapter, config);
     for (const excluded of resolved.excluded) {
       console.log(`  excluded ${excluded.name}: ${excluded.reason}`);
@@ -79,13 +85,18 @@ export async function runCommand(options: RunCommandOptions): Promise<string> {
   }
   if (descriptors.length === 0) {
     throw new Error(
-      'no candidates to run; pull a model (ollama pull gemma3:1b), pass --model, or list candidates in a --config file',
+      config.backend === 'anthropic'
+        ? 'no candidates to run; list model ids in the config file, e.g. candidates: [claude-haiku-4-5, claude-sonnet-4-5]'
+        : 'no candidates to run; pull a model (ollama pull gemma3:1b), pass --model, or list candidates in a --config file',
     );
   }
 
-  const gpu = queryGpuIdentity();
-  const freeVramMib = queryVramOnce()?.freeMib ?? null;
-  const assessments = await assessCandidates(adapter, descriptors, pack.manifest.generation.context, freeVramMib);
+  const gpu = config.backend === 'anthropic' ? null : queryGpuIdentity();
+  const freeVramMib = config.backend === 'anthropic' ? null : (queryVramOnce()?.freeMib ?? null);
+  const assessments =
+    adapter instanceof OllamaAdapter
+      ? await assessCandidates(adapter, descriptors, pack.manifest.generation.context, freeVramMib)
+      : descriptors.map((descriptor) => ({ descriptor, architecture: null, fit: notApplicableFit() }));
   // An explicitly named model is always attempted: naming it is the override.
   const force = (options.force ?? false) || options.model !== undefined;
   const plan = buildRunPlan(assessments, {
@@ -116,22 +127,27 @@ export async function runCommand(options: RunCommandOptions): Promise<string> {
           backendVersion,
           gpu,
           vramUnavailableReason:
-            gpu === null ? 'nvidia-smi is not available on this machine, so VRAM was not measured' : null,
+            config.backend === 'anthropic'
+              ? API_BACKEND_VRAM_REASON
+              : gpu === null
+                ? 'nvidia-smi is not available on this machine, so VRAM was not measured'
+                : null,
         },
       );
-      const outcome = await executeSweep(pack, prepared, {
+      const sweepOptions: SweepOptions = {
         adapter,
         store,
         onProgress: (line) => {
           console.log(`  ${line}`);
         },
-      });
-      const data = buildReportData(
-        outcome.run,
-        store.listCandidates(outcome.run.id),
-        store.listUnitResults(outcome.run.id),
-      );
-      const report = renderSweepReport(outcome) + renderComparison(data);
+        ...(config.backend === 'anthropic'
+          ? { startProbe: apiNoopProbe, sampleVram: () => null, cooldownMs: 0 }
+          : {}),
+      };
+      const outcome = await executeSweep(pack, prepared, sweepOptions);
+      const units = store.listUnitResults(outcome.run.id);
+      const data = buildReportData(outcome.run, store.listCandidates(outcome.run.id), units);
+      const report = renderSweepReport(outcome) + renderComparison(data) + renderTokenSpend(units);
       console.log(report);
       return report;
     } finally {

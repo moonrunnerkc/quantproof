@@ -58,8 +58,8 @@ export interface CandidateRecord {
   readonly quantization: string | null;
   readonly parameterSize: string | null;
   readonly sizeBytes: number;
-  /** Fit verdict at plan time. */
-  readonly fitVerdict: 'fits' | 'does-not-fit' | 'unknown';
+  /** Fit verdict at plan time; not-applicable for API backends. */
+  readonly fitVerdict: 'fits' | 'does-not-fit' | 'unknown' | 'not-applicable';
   /** Predicted peak VRAM at plan time; null when unpredictable. */
   readonly predictedPeakMib: number | null;
   /** The arithmetic behind the verdict, for predicted-vs-measured. */

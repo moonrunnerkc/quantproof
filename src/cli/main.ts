@@ -108,7 +108,13 @@ program
   .description('List candidate models with sizes, quant tags, and fit predictions')
   .option('--config <file>', 'run config file listing candidate models')
   .option('--context <n>', 'context length for the fit prediction (default 4096)', (v) => Number.parseInt(v, 10))
-  .action(async (options: { config?: string; context?: number }) => {
+  .option('--backend <name>', 'backend to list: ollama (default) or anthropic', (v) => {
+    if (v !== 'ollama' && v !== 'anthropic') {
+      throw new Error(`--backend must be "ollama" or "anthropic", got "${v}"`);
+    }
+    return v;
+  })
+  .action(async (options: { config?: string; context?: number; backend?: 'ollama' | 'anthropic' }) => {
     try {
       await modelsCommand(options);
     } catch (err) {
