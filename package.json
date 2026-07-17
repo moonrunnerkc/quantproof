@@ -18,7 +18,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "test": "vitest run",
-    "test:e2e": "echo 'e2e smoke test lands in phase 1; it needs a live Ollama instance. Run: npm test' && exit 0"
+    "test:e2e": "vitest run --config vitest.e2e.config.ts"
   },
   "dependencies": {
     "ajv": "^8.20.0",
