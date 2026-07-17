@@ -1,3 +1,7 @@
+import { execFileSync } from 'node:child_process';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { crc32, readZip, writeZip } from '../../src/results/zip-archive.js';
 
@@ -23,11 +27,27 @@ describe('writeZip / readZip', () => {
     expect(writeZip(entries, STAMP).equals(writeZip(entries, STAMP))).toBe(true);
   });
 
-  it('is readable by an independent implementation (python zipfile check lives in the e2e gate)', () => {
-    // The structural claim tested here: the archive self-describes its
-    // entry count through the central directory, not entry order guesses.
+  it('self-describes its entry count through the central directory', () => {
     const archive = writeZip(entries, STAMP);
     expect(readZip(archive)).toHaveLength(3);
+  });
+
+  it('is readable by an independent unzip implementation', () => {
+    // python3 zipfile is the cross-check that the writer emits real
+    // ZIP, not something only our own reader accepts.
+    const dir = mkdtempSync(join(tmpdir(), 'quantproof-zipcheck-'));
+    try {
+      const path = join(dir, 'check.zip');
+      writeFileSync(path, writeZip(entries, STAMP));
+      const listing = execFileSync(
+        'python3',
+        ['-c', `import zipfile; z = zipfile.ZipFile('${path}'); print(z.testzip()); print(len(z.namelist()))`],
+        { encoding: 'utf8' },
+      );
+      expect(listing.trim().split('\n')).toEqual(['None', '3']);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   it('rejects duplicate entry paths with the offending path named', () => {

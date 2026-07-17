@@ -92,6 +92,7 @@ of each section.
 - SIGINT during a sweep prints that completed units are journaled plus the exact resume command, releases the lock, and exits 130; the in-flight generation is discarded by design (the journal is transactional per unit).
 - Sweeps estimated over an hour warn at plan time with --limit and resume pointers; the estimate itself was already printed, the warning makes the sequential-by-design cost explicit.
 - VRAM timelines decimate at 4096 samples (halving resolution each time the cap is hit) while the peak tracks the raw stream, so no spike is ever lost to downsampling; documented in methodology.
+- Test honesty pass found no vi.mock and no was-called-only assertions anywhere; the two spy usages silence console output or assert prompting behavior. One defect fixed: a zip test named for an independent-implementation check it did not perform now actually shells out to python3 zipfile.
 
 ## Deferred
 
