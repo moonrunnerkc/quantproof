@@ -1,0 +1,25 @@
+name: e2e
+
+# The live suite runs against the Anthropic API and costs a few hundred
+# tokens, so it fires only on demand and on release tags. Without the
+# ANTHROPIC_API_KEY secret (forks, unconfigured clones) the suite skips
+# itself with a printed notice and the job stays green.
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+jobs:
+  api-backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run test:e2e
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
