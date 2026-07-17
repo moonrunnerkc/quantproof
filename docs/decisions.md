@@ -83,6 +83,16 @@ of each section.
 - A bundle exported from a cwd where the run's relative packDir does not resolve omits scoring.json by design (the drift check cannot pass); observed live, worth knowing before exporting from outside the repo root.
 - Git history rewritten (author and committer on every commit) to moonrunnerkc <bradkinnard@proton.me>: the desktop had been committing as root@VivoBookBrads.(none), which GitHub attributes to nobody.
 
+## Release hardening
+
+- Dependency review at release: npm audit reports zero vulnerabilities across the tree. npm ls flags six wasm shims (emnapi, napi-rs, tslib) extraneous; npm prune retains them because the eslint import resolver's optional wasm fallback wants them. Dev-only, not in the published package (files whitelist is dist), dispositioned as harmless. Runtime deps stay at four, each chosen once: commander (arg parsing with subcommands and typed options, no hand-rolled argv), yaml (the maintained YAML 1.2 parser, eemeli's), ajv (pack-declared JSON Schemas only), better-sqlite3 (synchronous transactions fit the per-unit journal exactly). Dev-side, vitest was picked in phase 0 for native ESM and typed test contexts; no entry existed for it or commander/yaml until now, which this line closes.
+- field-f1 now throws on a non-object expected value instead of scoring 0 forever; plan-check provokes every scorer authoring throw (params and expected types) before any inference by dry-scoring an empty output per example, and run/resume/validate all refuse with the full problem list.
+- Journal write failures (disk full, db turned read-only) translate to free-space-or-fix guidance ending in the resume command; store open wraps corrupt-file and unwritable-path errors the same way.
+- Concurrency guard: a lock row inside the results db (pid, command, start time) makes a second quantproof process refuse politely; a holder whose pid is dead is stale and taken over silently. Pid-recycling misclassification is possible and accepted: the failure mode is one spurious refusal message, not corruption.
+- SIGINT during a sweep prints that completed units are journaled plus the exact resume command, releases the lock, and exits 130; the in-flight generation is discarded by design (the journal is transactional per unit).
+- Sweeps estimated over an hour warn at plan time with --limit and resume pointers; the estimate itself was already printed, the warning makes the sequential-by-design cost explicit.
+- VRAM timelines decimate at 4096 samples (halving resolution each time the cap is hit) while the peak tracks the raw stream, so no spike is ever lost to downsampling; documented in methodology.
+
 ## Deferred
 
 - Word-number parsing ("forty-two") for numeric-tolerance.
