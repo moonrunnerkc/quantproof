@@ -14,12 +14,20 @@ import { RunStore } from '../../src/results/run-store.js';
 const MODEL = 'gemma3:1b';
 const PACK = resolve(import.meta.dirname, '../../examples/invoice-extraction');
 
+const ollamaUp = await fetch('http://localhost:11434/api/version').then(
+  (r) => r.ok,
+  () => false,
+);
+if (!ollamaUp) {
+  console.warn('skipping the ollama e2e suite: no Ollama at http://localhost:11434 (start it with: ollama serve)');
+}
+
 const dir = mkdtempSync(join(tmpdir(), 'quantproof-e2e-'));
 afterAll(() => {
   rmSync(dir, { recursive: true, force: true });
 });
 
-describe('quantproof run against live ollama', () => {
+describe.skipIf(!ollamaUp)('quantproof run against live ollama', () => {
   it('runs a 3-example slice and produces a full journal plus a report table', async () => {
     const db = join(dir, 'results.db');
     const report = await runCommand({ pack: PACK, model: MODEL, db, limit: 3 });
