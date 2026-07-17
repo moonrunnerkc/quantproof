@@ -1,0 +1,3 @@
+{"model":"gemma3:1b","created_at":"2026-07-16T03:37:16.664937765Z","response":"hello","done":false}
+{"model":"gemma3:1b","created_at":"2026-07-16T03:37:16.701941168Z","response":"\n","done":false}
+{"model":"gemma3:1b","created_at":"2026-07-16T03:37:16.739807756Z","response":"","done":true,"done_reason":"stop","context":[105,2364,107,40654,607,7121,506,3658,236787,29104,106,107,105,4368,107,23391,107],"total_duration":2092530176,"load_duration":1689983536,"prompt_eval_count":16,"prompt_eval_duration":216396255,"eval_count":3,"eval_duration":73980441}
