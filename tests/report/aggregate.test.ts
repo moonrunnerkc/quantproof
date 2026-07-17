@@ -1,36 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { median, summarizeRun } from '../../src/report/aggregate.js';
-import type { UnitResult } from '../../src/results/record-types.js';
-
-function unit(
-  exampleId: string,
-  repetition: number,
-  score: number,
-  overrides: { output?: string; ttftMs?: number | null; tps?: number | null; status?: 'completed' | 'failed' | 'pending' } = {},
-): UnitResult {
-  const status = overrides.status ?? 'completed';
-  const id = `${exampleId}-${String(repetition)}`;
-  if (status !== 'completed') {
-    return {
-      unit: { id, runId: 'r', candidateId: 'c', exampleId, repetition },
-      status,
-      failureReason: status === 'failed' ? 'boom' : null,
-      generation: null,
-      score: null,
-    };
-  }
-  return {
-    unit: { id, runId: 'r', candidateId: 'c', exampleId, repetition },
-    status,
-    failureReason: null,
-    generation: {
-      id: `g-${id}`, workUnitId: id, output: overrides.output ?? `out-${exampleId}`,
-      doneReason: 'stop', ttftMs: overrides.ttftMs ?? 100, tokensPerSecond: overrides.tps ?? 40,
-      wallMs: 500, tokenCount: 10, promptTokenCount: 20, outputTokenCount: 10, requestOptions: {},
-    },
-    score: { id: `s-${id}`, workUnitId: id, scorerName: 'field-f1', score, pass: score === 1, details: {} },
-  };
-}
+import {
+  aggregateCandidates,
+  isGatePassing,
+  median,
+  summarizeRun,
+} from '../../src/report/aggregate.js';
+import { candidateResult, unitResult as unit } from './report-fixtures.js';
 
 describe('median', () => {
   it('returns the middle value for odd counts', () => {
@@ -59,7 +34,7 @@ describe('summarizeRun', () => {
     expect(summary.passRate).toBe(0.75);
   });
 
-  it('computes latency medians over completed units only', () => {
+  it('computes latency medians and spreads over completed units only', () => {
     const summary = summarizeRun([
       unit('001', 1, 1, { ttftMs: 100, tps: 10 }),
       unit('002', 1, 1, { ttftMs: 300, tps: 30 }),
@@ -67,7 +42,9 @@ describe('summarizeRun', () => {
       unit('004', 1, 0, { status: 'failed' }),
     ]);
     expect(summary.ttftMedianMs).toBe(200);
+    expect(summary.ttftSpreadMs).toEqual({ min: 100, max: 300 });
     expect(summary.tokensPerSecondMedian).toBe(30);
+    expect(summary.tokensPerSecondSpread).toEqual({ min: 10, max: 50 });
     expect(summary.completed).toBe(3);
     expect(summary.failed).toBe(1);
   });
@@ -98,6 +75,102 @@ describe('summarizeRun', () => {
     expect(summary.passRate).toBeNull();
     expect(summary.scoreSpread).toBeNull();
     expect(summary.ttftMedianMs).toBeNull();
+    expect(summary.ttftSpreadMs).toBeNull();
+    expect(summary.tokensPerSecondSpread).toBeNull();
     expect(summary.pending).toBe(1);
+  });
+});
+
+describe('aggregateCandidates', () => {
+  it('groups units per candidate and keeps candidates in order', () => {
+    const aggregates = aggregateCandidates(
+      [candidateResult('c1', 'gemma3:4b'), candidateResult('c2', 'gemma3:1b')],
+      [
+        unit('001', 1, 1, { candidateId: 'c1' }),
+        unit('001', 1, 0.5, { candidateId: 'c2' }),
+      ],
+    );
+    expect(aggregates.map((a) => a.candidate.modelName)).toEqual(['gemma3:4b', 'gemma3:1b']);
+    expect(aggregates[0]?.summary.meanScore).toBe(1);
+    expect(aggregates[1]?.summary.meanScore).toBe(0.5);
+  });
+
+  it('computes the predicted versus measured vram delta in percent', () => {
+    const [agg] = aggregateCandidates(
+      [candidateResult('c1', 'gemma3:4b', { peakVramMib: 4400, record: { predictedPeakMib: 4000 } })],
+      [unit('001', 1, 1, { candidateId: 'c1' })],
+    );
+    expect(agg?.vramDeltaPercent).toBeCloseTo(10, 10);
+  });
+
+  it('reports a null vram delta when either side is unmeasured', () => {
+    const aggregates = aggregateCandidates(
+      [
+        candidateResult('c1', 'a', { peakVramMib: null }),
+        candidateResult('c2', 'b', { record: { predictedPeakMib: null } }),
+      ],
+      [unit('001', 1, 1, { candidateId: 'c1' }), unit('001', 1, 1, { candidateId: 'c2' })],
+    );
+    expect(aggregates[0]?.vramDeltaPercent).toBeNull();
+    expect(aggregates[1]?.vramDeltaPercent).toBeNull();
+  });
+
+  it('counts gate failures per gate and marks the candidate a gate-failer', () => {
+    const [agg] = aggregateCandidates(
+      [candidateResult('c1', 'gemma3:1b')],
+      [
+        unit('001', 1, 0, { candidateId: 'c1', failedGate: 'json-schema' }),
+        unit('002', 1, 0, { candidateId: 'c1', failedGate: 'json-schema' }),
+        unit('003', 1, 1, { candidateId: 'c1' }),
+      ],
+    );
+    expect(agg?.gatesPassed).toBe(false);
+    expect(agg?.gateFailureCounts).toEqual({ 'json-schema': 2 });
+  });
+
+  it('marks gates passed when every completed unit cleared every gate', () => {
+    const [agg] = aggregateCandidates(
+      [candidateResult('c1', 'gemma3:1b')],
+      [unit('001', 1, 1, { candidateId: 'c1' }), unit('002', 1, 0.8, { candidateId: 'c1' })],
+    );
+    expect(agg?.gatesPassed).toBe(true);
+    expect(agg?.gateFailureCounts).toEqual({});
+  });
+
+  it('leaves gate state null when nothing completed', () => {
+    const [agg] = aggregateCandidates(
+      [candidateResult('c1', 'big-model', { status: 'oom', peakVramMib: null })],
+      [unit('001', 1, 0, { candidateId: 'c1', status: 'skipped' })],
+    );
+    expect(agg?.gatesPassed).toBeNull();
+    expect(agg?.summary.meanScore).toBeNull();
+  });
+});
+
+describe('isGatePassing', () => {
+  const build = (
+    status: 'completed' | 'oom',
+    failedGate?: string,
+  ): ReturnType<typeof aggregateCandidates>[number] => {
+    const [agg] = aggregateCandidates(
+      [candidateResult('c1', 'm', { status })],
+      [unit('001', 1, failedGate === undefined ? 1 : 0, { candidateId: 'c1', ...(failedGate === undefined ? {} : { failedGate }) })],
+    );
+    if (agg === undefined) {
+      throw new Error('aggregateCandidates returned nothing for a one-candidate input');
+    }
+    return agg;
+  };
+
+  it('accepts a completed candidate whose units all passed their gates', () => {
+    expect(isGatePassing(build('completed'))).toBe(true);
+  });
+
+  it('rejects a candidate with any gate failure', () => {
+    expect(isGatePassing(build('completed', 'json-schema'))).toBe(false);
+  });
+
+  it('rejects an oom candidate even when its completed units passed', () => {
+    expect(isGatePassing(build('oom'))).toBe(false);
   });
 });

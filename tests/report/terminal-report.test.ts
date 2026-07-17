@@ -12,7 +12,9 @@ const summary: RunSummary = {
     { repetition: 3, meanScore: 0.95 },
   ],
   scoreSpread: { min: 0.93, max: 0.95 },
-  ttftMedianMs: 231.4, tokensPerSecondMedian: 42.7, wallMsTotal: 60000,
+  ttftMedianMs: 231.4, ttftSpreadMs: { min: 198.2, max: 267.9 },
+  tokensPerSecondMedian: 42.7, tokensPerSecondSpread: { min: 40.1, max: 44.9 },
+  wallMsTotal: 60000,
   outputsDeterministic: true,
 };
 
