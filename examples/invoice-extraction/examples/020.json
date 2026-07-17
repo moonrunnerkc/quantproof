@@ -1,0 +1,9 @@
+{
+  "input": "BILL TO: Accounts Payable\nVENDOR: Stonebridge Accounting\nINVOICE NUMBER: SB-2026-407\nISSUE DATE: 2026-05-01\nDUE DATE: 2026-05-31\n\nCharges:\n  Q1 bookkeeping and filings  $1,680.00\n\nInvoice total: $1,680.00 USD",
+  "expected": {
+    "vendor": "Stonebridge Accounting",
+    "invoice_number": "SB-2026-407",
+    "total": 1680,
+    "due_date": "2026-05-31"
+  }
+}

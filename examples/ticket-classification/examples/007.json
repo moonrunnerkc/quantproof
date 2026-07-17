@@ -1,0 +1,4 @@
+{
+  "input": "Uploading a CSV over 10 MB crashes the import wizard every single time.",
+  "expected": "bug"
+}

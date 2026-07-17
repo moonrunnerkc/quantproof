@@ -1,0 +1,4 @@
+{
+  "input": "Can I get a copy of your SOC 2 report for our vendor review?",
+  "expected": "other"
+}

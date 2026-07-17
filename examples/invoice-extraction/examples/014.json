@@ -1,0 +1,9 @@
+{
+  "input": "Citadel IT Services\n--- TAX INVOICE ---\nNo. CIT-26-0781 | Issued 2026-08-03\n\n  Managed services, August  $7,200.00\n  After-hours incident response, 8.7 hrs  $1,740.00\n\nAmount due: $8,940.00\nPlease remit payment by 2026-09-01.",
+  "expected": {
+    "vendor": "Citadel IT Services",
+    "invoice_number": "CIT-26-0781",
+    "total": 8940,
+    "due_date": "2026-09-01"
+  }
+}

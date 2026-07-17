@@ -1,0 +1,9 @@
+{
+  "input": "Set up feature-flags on port 7070 with 2 replicas. Use info logging.",
+  "expected": {
+    "name": "feature-flags",
+    "port": 7070,
+    "replicas": 2,
+    "log_level": "info"
+  }
+}

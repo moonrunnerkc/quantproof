@@ -1,0 +1,9 @@
+{
+  "input": "Create a config for a service named payments-api. It listens on port 8080, runs 3 replicas, and logs at info level.",
+  "expected": {
+    "name": "payments-api",
+    "port": 8080,
+    "replicas": 3,
+    "log_level": "info"
+  }
+}

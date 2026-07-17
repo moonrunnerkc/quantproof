@@ -1,0 +1,9 @@
+{
+  "input": "BILL TO: Accounts Payable\nVENDOR: Harbor Electric Inc.\nINVOICE NUMBER: HE-2026-2093\nISSUE DATE: 2026-07-22\nDUE DATE: 2026-08-20\n\nCharges:\n  Panel upgrade, warehouse B  $2,800.00\n  Permit and inspection  $610.25\n\nInvoice total: $3,410.25 USD",
+  "expected": {
+    "vendor": "Harbor Electric Inc.",
+    "invoice_number": "HE-2026-2093",
+    "total": 3410.25,
+    "due_date": "2026-08-20"
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "input": "Service: image-resizer. Port: 8181. Replicas: 2. Log level: info. Generate the config.",
+  "expected": {
+    "name": "image-resizer",
+    "port": 8181,
+    "replicas": 2,
+    "log_level": "info"
+  }
+}

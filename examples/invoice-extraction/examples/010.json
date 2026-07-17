@@ -1,0 +1,9 @@
+{
+  "input": "Alpine Snow Removal\n--- TAX INVOICE ---\nNo. ASR-2026-118 | Issued 2026-03-03\n\n  Lot clearing, 4 visits  $480.00\n  Ice melt application  $80.00\n\nAmount due: $560.00\nPlease remit payment by 2026-03-31.",
+  "expected": {
+    "vendor": "Alpine Snow Removal",
+    "invoice_number": "ASR-2026-118",
+    "total": 560,
+    "due_date": "2026-03-31"
+  }
+}

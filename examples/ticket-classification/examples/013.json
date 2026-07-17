@@ -1,0 +1,4 @@
+{
+  "input": "Any chance of an API endpoint for bulk-updating tags? Doing it one at a time is painful.",
+  "expected": "feature-request"
+}

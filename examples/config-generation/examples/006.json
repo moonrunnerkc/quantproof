@@ -1,0 +1,9 @@
+{
+  "input": "I need the metrics-collector service configured: port 9090, 2 replicas, log level info.",
+  "expected": {
+    "name": "metrics-collector",
+    "port": 9090,
+    "replicas": 2,
+    "log_level": "info"
+  }
+}

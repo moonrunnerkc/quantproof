@@ -1,0 +1,9 @@
+{
+  "input": "INVOICE\n\nLakeside Storage Solutions\nInvoice #: LS-11240\nInvoice date: 2026-04-05\nPayment due: 2026-05-05\n\n  Unit 214 rental, May  $275.00\n\nTOTAL DUE: $275.00",
+  "expected": {
+    "vendor": "Lakeside Storage Solutions",
+    "invoice_number": "LS-11240",
+    "total": 275,
+    "due_date": "2026-05-05"
+  }
+}

@@ -1,0 +1,4 @@
+{
+  "input": "Notifications fire for archived projects even though the settings say they are muted. That has to be a defect.",
+  "expected": "bug"
+}

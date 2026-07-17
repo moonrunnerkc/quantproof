@@ -1,0 +1,9 @@
+{
+  "input": "I need the rate-limiter service configured: port 7500, 4 replicas, log level error.",
+  "expected": {
+    "name": "rate-limiter",
+    "port": 7500,
+    "replicas": 4,
+    "log_level": "error"
+  }
+}

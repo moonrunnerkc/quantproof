@@ -1,0 +1,9 @@
+{
+  "input": "Create a config for a service named gateway. It listens on port 443, runs 6 replicas, and logs at error level.",
+  "expected": {
+    "name": "gateway",
+    "port": 443,
+    "replicas": 6,
+    "log_level": "error"
+  }
+}

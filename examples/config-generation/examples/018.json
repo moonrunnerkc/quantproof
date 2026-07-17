@@ -1,0 +1,9 @@
+{
+  "input": "I need the media-transcoder service configured: port 8550, 6 replicas, log level info.",
+  "expected": {
+    "name": "media-transcoder",
+    "port": 8550,
+    "replicas": 6,
+    "log_level": "info"
+  }
+}

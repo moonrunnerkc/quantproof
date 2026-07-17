@@ -1,0 +1,9 @@
+{
+  "input": "Cascade Office Supply\n--- TAX INVOICE ---\nNo. INV-88213 | Issued 2026-03-16\n\n  Copy paper, 20 cases  $189.80\n  Toner cartridges x3  $122.95\n\nAmount due: $312.75\nPlease remit payment by 2026-04-15.",
+  "expected": {
+    "vendor": "Cascade Office Supply",
+    "invoice_number": "INV-88213",
+    "total": 312.75,
+    "due_date": "2026-04-15"
+  }
+}

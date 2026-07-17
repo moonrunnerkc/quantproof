@@ -1,0 +1,9 @@
+{
+  "input": "From: Juniper Creative Studio\nRe: Invoice JCS-092\n\nHi,\n\nPlease find your invoice below. Payment is due on 2026-06-18.\n\n  Brand refresh, phase 1  $3,750.00\n\nBalance due: $3,750.00\n\nThanks for your business!",
+  "expected": {
+    "vendor": "Juniper Creative Studio",
+    "invoice_number": "JCS-092",
+    "total": 3750,
+    "due_date": "2026-06-18"
+  }
+}

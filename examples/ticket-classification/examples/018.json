@@ -1,0 +1,4 @@
+{
+  "input": "Requesting an option to set per-project permissions instead of workspace-wide roles.",
+  "expected": "feature-request"
+}

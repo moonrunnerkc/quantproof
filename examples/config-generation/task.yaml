@@ -1,0 +1,22 @@
+name: config-generation
+type: generation
+scorer: json-schema
+scorer_params:
+  schema: ./schema.json
+generation:
+  context: 2048
+  max_tokens: 256
+  temperature: 0
+  seed: 42
+  runs_per_example: 3
+prompt_template: ./prompt.md
+examples_dir: ./examples
+gates:
+  - scorer: pattern
+    scorer_params:
+      mode: regex
+      match: all
+      patterns:
+        - '"name"\s*:\s*"[a-z][a-z0-9-]*"'
+        - '"port"\s*:\s*\d+'
+        - '"log_level"\s*:\s*"(debug|info|warn|error)"'

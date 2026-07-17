@@ -1,0 +1,9 @@
+{
+  "input": "Service: inventory-sync. Port: 8760. Replicas: 2. Log level: info. Generate the config.",
+  "expected": {
+    "name": "inventory-sync",
+    "port": 8760,
+    "replicas": 2,
+    "log_level": "info"
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "input": "I need the report-builder service configured: port 8600, 1 replicas, log level debug.",
+  "expected": {
+    "name": "report-builder",
+    "port": 8600,
+    "replicas": 1,
+    "log_level": "debug"
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "input": "Service: email-worker. Port: 8025. Replicas: 4. Log level: info. Generate the config.",
+  "expected": {
+    "name": "email-worker",
+    "port": 8025,
+    "replicas": 4,
+    "log_level": "info"
+  }
+}

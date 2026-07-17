@@ -1,0 +1,9 @@
+{
+  "input": "Service: notification-hub. Port: 8888. Replicas: 5. Log level: info. Generate the config.",
+  "expected": {
+    "name": "notification-hub",
+    "port": 8888,
+    "replicas": 5,
+    "log_level": "info"
+  }
+}

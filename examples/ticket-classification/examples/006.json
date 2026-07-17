@@ -1,0 +1,4 @@
+{
+  "input": "My invoice shows the old pricing tier even though I downgraded last month. Please correct it.",
+  "expected": "billing"
+}

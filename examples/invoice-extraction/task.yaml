@@ -1,0 +1,17 @@
+name: invoice-extraction
+type: extraction
+scorer: field-f1
+scorer_params:
+  key_fields: [vendor, total, due_date]
+generation:
+  context: 4096
+  max_tokens: 512
+  temperature: 0
+  seed: 42
+  runs_per_example: 3
+prompt_template: ./prompt.md
+examples_dir: ./examples
+gates:
+  - scorer: json-schema
+    scorer_params:
+      schema: ./schema.json

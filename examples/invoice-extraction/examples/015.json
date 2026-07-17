@@ -1,0 +1,9 @@
+{
+  "input": "From: Prairie Wind Bakery\nRe: Invoice PWB-3312\n\nHi,\n\nPlease find your invoice below. Payment is due on 2026-04-22.\n\n  Weekly pastry delivery x4  $428.60\n\nBalance due: $428.60\n\nThanks for your business!",
+  "expected": {
+    "vendor": "Prairie Wind Bakery",
+    "invoice_number": "PWB-3312",
+    "total": 428.6,
+    "due_date": "2026-04-22"
+  }
+}

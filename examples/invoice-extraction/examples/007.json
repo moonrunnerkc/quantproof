@@ -1,0 +1,9 @@
+{
+  "input": "From: Sunrise Web Hosting\nRe: Invoice SWH-90331\n\nHi,\n\nPlease find your invoice below. Payment is due on 2026-04-30.\n\n  VPS hosting, April  $80.00\n  Backup storage add-on  $16.00\n\nBalance due: $96.00\n\nThanks for your business!",
+  "expected": {
+    "vendor": "Sunrise Web Hosting",
+    "invoice_number": "SWH-90331",
+    "total": 96,
+    "due_date": "2026-04-30"
+  }
+}

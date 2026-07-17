@@ -1,0 +1,4 @@
+{
+  "input": "My two-factor authentication app was on a phone I lost. I am locked out of my profile.",
+  "expected": "account"
+}

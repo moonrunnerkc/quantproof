@@ -1,0 +1,22 @@
+name: ticket-classification
+type: classification
+scorer: exact-label
+scorer_params:
+  labels: [billing, bug, feature-request, account, other]
+  aliases:
+    bug report: bug
+    defect: bug
+    billing issue: billing
+    invoice question: billing
+    feature request: feature-request
+    enhancement: feature-request
+    account issue: account
+    login problem: account
+generation:
+  context: 2048
+  max_tokens: 16
+  temperature: 0
+  seed: 42
+  runs_per_example: 3
+prompt_template: ./prompt.md
+examples_dir: ./examples

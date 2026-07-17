@@ -1,0 +1,9 @@
+{
+  "input": "I need the auth-service service configured: port 9443, 2 replicas, log level warn.",
+  "expected": {
+    "name": "auth-service",
+    "port": 9443,
+    "replicas": 2,
+    "log_level": "warn"
+  }
+}

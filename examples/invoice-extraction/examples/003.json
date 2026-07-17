@@ -1,0 +1,9 @@
+{
+  "input": "From: Peak Analytics LLC\nRe: Invoice 2026-031\n\nHi,\n\nPlease find your invoice below. Payment is due on 2026-07-31.\n\n  Quarterly analytics retainer  $12,500.00\n\nBalance due: $12,500.00\n\nThanks for your business!",
+  "expected": {
+    "vendor": "Peak Analytics LLC",
+    "invoice_number": "2026-031",
+    "total": 12500,
+    "due_date": "2026-07-31"
+  }
+}

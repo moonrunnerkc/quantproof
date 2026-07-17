@@ -1,0 +1,9 @@
+{
+  "input": "Service: audit-logger. Port: 9200. Replicas: 3. Log level: warn. Generate the config.",
+  "expected": {
+    "name": "audit-logger",
+    "port": 9200,
+    "replicas": 3,
+    "log_level": "warn"
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "input": "Set up session-cache on port 6380 with 3 replicas. Use warn logging.",
+  "expected": {
+    "name": "session-cache",
+    "port": 6380,
+    "replicas": 3,
+    "log_level": "warn"
+  }
+}

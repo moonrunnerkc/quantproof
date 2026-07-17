@@ -1,0 +1,9 @@
+{
+  "input": "INVOICE\n\nNorthwind Traders Ltd.\nInvoice #: NW-2026-0142\nInvoice date: 2026-05-02\nPayment due: 2026-06-01\n\n  Freight services, April  $3,600.00\n  Fuel surcharge  $980.50\n  Documentation fee  $240.00\n\nTOTAL DUE: $4,820.50",
+  "expected": {
+    "vendor": "Northwind Traders Ltd.",
+    "invoice_number": "NW-2026-0142",
+    "total": 4820.5,
+    "due_date": "2026-06-01"
+  }
+}

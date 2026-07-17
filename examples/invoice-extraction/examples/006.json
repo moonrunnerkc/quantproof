@@ -1,0 +1,9 @@
+{
+  "input": "Ironwood Legal Group\n--- TAX INVOICE ---\nNo. ILG-2026-0457 | Issued 2026-07-08\n\n  Contract review, 12.3 hrs @ $500  $6,150.00\n\nAmount due: $6,150.00\nPlease remit payment by 2026-08-05.",
+  "expected": {
+    "vendor": "Ironwood Legal Group",
+    "invoice_number": "ILG-2026-0457",
+    "total": 6150,
+    "due_date": "2026-08-05"
+  }
+}

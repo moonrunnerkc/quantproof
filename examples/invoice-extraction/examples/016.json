@@ -1,0 +1,9 @@
+{
+  "input": "BILL TO: Accounts Payable\nVENDOR: Vertex Machine Works\nINVOICE NUMBER: VMW-2026-054\nISSUE DATE: 2026-06-20\nDUE DATE: 2026-07-20\n\nCharges:\n  CNC milling, bracket run of 500  $19,500.00\n  Tooling setup  $2,370.00\n\nInvoice total: $21,870.00 USD",
+  "expected": {
+    "vendor": "Vertex Machine Works",
+    "invoice_number": "VMW-2026-054",
+    "total": 21870,
+    "due_date": "2026-07-20"
+  }
+}

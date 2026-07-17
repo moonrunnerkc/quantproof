@@ -1,0 +1,9 @@
+{
+  "input": "Set up fraud-scorer on port 9310 with 3 replicas. Use error logging.",
+  "expected": {
+    "name": "fraud-scorer",
+    "port": 9310,
+    "replicas": 3,
+    "log_level": "error"
+  }
+}

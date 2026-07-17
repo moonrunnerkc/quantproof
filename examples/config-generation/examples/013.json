@@ -1,0 +1,9 @@
+{
+  "input": "Create a config for a service named pdf-renderer. It listens on port 8090, runs 2 replicas, and logs at info level.",
+  "expected": {
+    "name": "pdf-renderer",
+    "port": 8090,
+    "replicas": 2,
+    "log_level": "info"
+  }
+}

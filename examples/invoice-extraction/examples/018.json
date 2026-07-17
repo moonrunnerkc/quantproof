@@ -1,0 +1,9 @@
+{
+  "input": "Copperline Communications\n--- TAX INVOICE ---\nNo. CC-2026-1618 | Issued 2026-07-16\n\n  Fiber install, suite 300  $4,800.00\n  Cabling materials  $805.75\n\nAmount due: $5,605.75\nPlease remit payment by 2026-08-15.",
+  "expected": {
+    "vendor": "Copperline Communications",
+    "invoice_number": "CC-2026-1618",
+    "total": 5605.75,
+    "due_date": "2026-08-15"
+  }
+}

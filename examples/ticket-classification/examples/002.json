@@ -1,0 +1,4 @@
+{
+  "input": "The export button on the reports page does nothing when I click it. Console shows a 500 error.",
+  "expected": "bug"
+}

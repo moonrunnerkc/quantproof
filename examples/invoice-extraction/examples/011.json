@@ -1,0 +1,9 @@
+{
+  "input": "From: Quantum Print Shop\nRe: Invoice QP-40119\n\nHi,\n\nPlease find your invoice below. Payment is due on 2026-07-14.\n\n  Trade show banners x6  $594.00\n  Business cards, 2000  $139.90\n\nBalance due: $733.90\n\nThanks for your business!",
+  "expected": {
+    "vendor": "Quantum Print Shop",
+    "invoice_number": "QP-40119",
+    "total": 733.9,
+    "due_date": "2026-07-14"
+  }
+}

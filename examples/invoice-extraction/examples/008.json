@@ -1,0 +1,9 @@
+{
+  "input": "BILL TO: Accounts Payable\nVENDOR: Meridian Freight Co\nINVOICE NUMBER: MF-77802\nISSUE DATE: 2026-05-27\nDUE DATE: 2026-06-25\n\nCharges:\n  Container shipping DEN-LAX x4  $14,200.00\n  Detention charges  $1,030.40\n\nInvoice total: $15,230.40 USD",
+  "expected": {
+    "vendor": "Meridian Freight Co",
+    "invoice_number": "MF-77802",
+    "total": 15230.4,
+    "due_date": "2026-06-25"
+  }
+}

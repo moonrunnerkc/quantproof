@@ -1,0 +1,9 @@
+{
+  "input": "INVOICE\n\nGolden Gate Translations\nInvoice #: GGT-334\nInvoice date: 2026-04-17\nPayment due: 2026-05-15\n\n  Technical manual, ES translation, 20600 words  $1,287.50\n\nTOTAL DUE: $1,287.50",
+  "expected": {
+    "vendor": "Golden Gate Translations",
+    "invoice_number": "GGT-334",
+    "total": 1287.5,
+    "due_date": "2026-05-15"
+  }
+}

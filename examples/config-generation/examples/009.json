@@ -1,0 +1,9 @@
+{
+  "input": "Create a config for a service named webhook-dispatcher. It listens on port 8443, runs 5 replicas, and logs at error level.",
+  "expected": {
+    "name": "webhook-dispatcher",
+    "port": 8443,
+    "replicas": 5,
+    "log_level": "error"
+  }
+}

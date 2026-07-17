@@ -1,0 +1,9 @@
+{
+  "input": "INVOICE\n\nFernwood Landscaping\nInvoice #: FL-8867\nInvoice date: 2026-06-02\nPayment due: 2026-06-30\n\n  Monthly grounds maintenance  $1,450.00\n  Irrigation repair  $475.00\n\nTOTAL DUE: $1,925.00",
+  "expected": {
+    "vendor": "Fernwood Landscaping",
+    "invoice_number": "FL-8867",
+    "total": 1925,
+    "due_date": "2026-06-30"
+  }
+}

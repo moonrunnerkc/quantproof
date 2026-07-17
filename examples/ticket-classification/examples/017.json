@@ -1,0 +1,4 @@
+{
+  "input": "Search returns results from projects I deleted weeks ago. The index seems stale or broken.",
+  "expected": "bug"
+}

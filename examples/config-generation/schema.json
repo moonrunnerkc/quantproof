@@ -1,0 +1,12 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["name", "port", "replicas", "log_level"],
+  "properties": {
+    "name": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+    "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+    "replicas": { "type": "integer", "minimum": 1 },
+    "log_level": { "enum": ["debug", "info", "warn", "error"] }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,9 @@
+{
+  "input": "Set up geo-lookup on port 8282 with 1 replicas. Use debug logging.",
+  "expected": {
+    "name": "geo-lookup",
+    "port": 8282,
+    "replicas": 1,
+    "log_level": "debug"
+  }
+}

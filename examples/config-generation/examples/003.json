@@ -1,0 +1,9 @@
+{
+  "input": "Set up search-indexer on port 7700 with 1 replicas. Use debug logging.",
+  "expected": {
+    "name": "search-indexer",
+    "port": 7700,
+    "replicas": 1,
+    "log_level": "debug"
+  }
+}

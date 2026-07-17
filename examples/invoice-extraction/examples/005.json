@@ -1,0 +1,9 @@
+{
+  "input": "INVOICE\n\nBlue Spruce Catering\nInvoice #: BSC-1189\nInvoice date: 2026-05-28\nPayment due: 2026-06-10\n\n  Company retreat lunch, 78 heads  $2,106.00\n  Service staff  $234.00\n\nTOTAL DUE: $2,340.00",
+  "expected": {
+    "vendor": "Blue Spruce Catering",
+    "invoice_number": "BSC-1189",
+    "total": 2340,
+    "due_date": "2026-06-10"
+  }
+}

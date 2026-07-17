@@ -1,0 +1,9 @@
+{
+  "input": "BILL TO: Accounts Payable\nVENDOR: Redstone Plumbing & Heating\nINVOICE NUMBER: RP-5521\nISSUE DATE: 2026-05-06\nDUE DATE: 2026-05-20\n\nCharges:\n  Boiler inspection  $250.00\n  Valve replacement, parts  $397.20\n  Labor, 2 hrs  $200.00\n\nInvoice total: $847.20 USD",
+  "expected": {
+    "vendor": "Redstone Plumbing & Heating",
+    "invoice_number": "RP-5521",
+    "total": 847.2,
+    "due_date": "2026-05-20"
+  }
+}
