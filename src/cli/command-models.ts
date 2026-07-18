@@ -16,6 +16,7 @@ import { resolveCandidates } from '../catalog/model-resolver.js';
 import { assessCandidates } from '../orchestrator/run-planner.js';
 import { fmtMib, renderColumns, wrapLine } from '../report/format.js';
 import { selectMemoryProbes } from '../telemetry/probe-select.js';
+import type { MemorySource, ProbeSelectOptions } from '../telemetry/probe-select.js';
 
 /** Options parsed from the command line. */
 export interface ModelsCommandOptions {
@@ -28,9 +29,18 @@ export interface ModelsCommandOptions {
   readonly baseUrl?: string;
   /** Injectable backend, for tests; defaults to the Ollama adapter. */
   readonly adapter?: BackendAdapter & ModelInfoSource;
+  /** Probe overrides, for tests; defaults to real hardware detection. */
+  readonly probeOptions?: ProbeSelectOptions;
 }
 
 const DEFAULT_PREVIEW_CONTEXT = 4096;
+
+function budgetNote(source: MemorySource): string {
+  if (source === 'unified-memory') {
+    return ' (75% unified-memory budget minus resident backend memory)';
+  }
+  return source === 'system-memory' ? ' (system RAM via MemAvailable, CPU inference)' : '';
+}
 
 async function listAnthropicModels(baseUrl?: string): Promise<string> {
   const adapter = new AnthropicAdapter(baseUrl);
@@ -86,15 +96,15 @@ export async function modelsCommand(options: ModelsCommandOptions): Promise<stri
   const config = options.config === undefined ? DEFAULT_RUN_CONFIG : loadRunConfig(options.config);
   const resolved = await resolveCandidates(adapter, config);
   const context = options.context ?? DEFAULT_PREVIEW_CONTEXT;
-  const probes = selectMemoryProbes('ollama');
+  const probes = selectMemoryProbes('ollama', options.probeOptions ?? {});
   const freeVramMib = probes.sampleOnce()?.freeMib ?? null;
   const assessments = await assessCandidates(adapter, resolved.candidates, context, freeVramMib);
 
   const lines: string[] = [
     `${String(assessments.length)} candidate${assessments.length === 1 ? '' : 's'} | ${backendVersion} | ` +
       (freeVramMib === null
-        ? 'free memory not measurable (no nvidia-smi, not Apple Silicon macOS), so fit verdicts are "unknown" and a sweep will attempt every candidate'
-        : `${fmtMib(freeVramMib)} MiB free for models${probes.source === 'unified-memory' ? ' (75% unified-memory budget minus resident backend memory)' : ''}`),
+        ? 'free memory not measurable (no nvidia-smi, not Apple Silicon macOS, /proc/meminfo unreadable), so fit verdicts are "unknown" and a sweep will attempt every candidate'
+        : `${fmtMib(freeVramMib)} MiB free for models${budgetNote(probes.source)}`),
     `fit predicted at context ${String(context)}; a sweep uses each pack's declared context (preview another with --context)`,
     '',
   ];

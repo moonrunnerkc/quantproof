@@ -124,7 +124,7 @@ export function predictFit(
   if (freeVramMib === null) {
     return {
       verdict: 'unknown',
-      reason: 'free VRAM could not be sampled (no GPU telemetry), so no fit verdict is possible',
+      reason: 'free memory could not be sampled (no working memory telemetry), so no fit verdict is possible',
       predictedPeakMib,
       weightsMib,
       kvCacheMib: kv,

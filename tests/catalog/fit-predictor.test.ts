@@ -51,11 +51,11 @@ describe('predictFit', () => {
     expect(fit.verdict).toBe('does-not-fit');
   });
 
-  it('returns unknown with the computed peak when free VRAM is unmeasurable', () => {
+  it('returns unknown with the computed peak when free memory is unmeasurable', () => {
     const fit = predictFit(QWEN14B_BYTES, qwen14b, 8192, null);
     expect(fit.verdict).toBe('unknown');
     expect(fit.predictedPeakMib).toBeCloseTo(WEIGHTS_14B_MIB + 2304, 5);
-    expect(fit.reason).toContain('free VRAM could not be sampled');
+    expect(fit.reason).toContain('free memory could not be sampled');
   });
 
   it('returns unknown without a peak when the architecture is unknown, and never throws', () => {

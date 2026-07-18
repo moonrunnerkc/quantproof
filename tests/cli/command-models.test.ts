@@ -85,3 +85,26 @@ describe('modelsCommand', () => {
     vi.restoreAllMocks();
   });
 });
+
+describe('modelsCommand on a CPU-only box', () => {
+  it('prints real fit verdicts against system RAM via MemAvailable', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    const { mkdtempSync, writeFileSync } = await import('node:fs');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    const dir = mkdtempSync(join(tmpdir(), 'qp-models-sys-'));
+    const meminfo = join(dir, 'meminfo');
+    writeFileSync(meminfo, 'MemTotal:       16000000 kB\nMemAvailable:    4096000 kB\n');
+    const text = await modelsCommand({
+      adapter: fakeAdapter(),
+      probeOptions: {
+        nvidiaBinary: join(dir, 'no-such-nvidia-smi'),
+        unified: { platform: 'linux' },
+        system: { meminfoPath: meminfo, osRelease: '6.17.0-test' },
+      },
+    });
+    expect(text).toContain('4000 MiB free for models (system RAM via MemAvailable, CPU inference)');
+    expect(text).toMatch(/gemma3:1b.*fits/);
+    expect(text).toMatch(/mystery:7b\s+.*unknown/);
+  });
+});

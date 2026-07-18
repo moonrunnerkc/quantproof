@@ -125,6 +125,16 @@ describe('renderMarkdownReport', () => {
     expect(rendered).toContain('| not measured |');
   });
 
+  it('labels a system-RAM run as CPU inference in the methodology', () => {
+    const data = caseStudyData();
+    const rendered = renderMarkdownReport({
+      ...data,
+      run: runRecord({ gpuName: 'system RAM', driverVersion: 'kernel 6.17.0-test' }),
+    });
+    expect(rendered).toContain('resident backend process memory against system RAM, CPU inference');
+    expect(rendered).toContain('system RAM, driver kernel 6.17.0-test');
+  });
+
   it('footnotes an interrupted candidate and points at resume', () => {
     const data = caseStudyData();
     const interrupted = makeAggregate('half-done', { quality: null, vram: null, tps: null, status: 'running' });
