@@ -20,7 +20,7 @@ Measured results of running the invoice-extraction task pack against 5 local mod
 
 ## Results
 
-| model | quant | quality (spread) | pass | TTFT ms (spread) | tok/s (spread) | peak VRAM MiB | predicted MiB (delta) | flags |
+| model | quant | quality (spread) | pass | TTFT ms (spread) | tok/s (spread) | peak memory MiB | predicted MiB (delta) | flags |
 | --- | --- | --- | ---: | --- | --- | ---: | --- | --- |
 | qwen3:14b | Q4_K_M | 0.917 (0.900..0.930) | 100.0% | 640 (512..811) | 10.4 (9.8..11.2) | 10190 | 10000 (+1.9%) |  |
 | gemma3:4b | Q4_K_M | 0.905 (0.900..0.910) | 100.0% | 231 (198..268) | 25.2 (24.1..26.0) | 4212 | 4000 (+5.3%) |  |
@@ -34,7 +34,7 @@ Measured results of running the invoice-extraction task pack against 5 local mod
 
 ## Pareto frontier
 
-Non-dominated on quality, peak VRAM, and median tokens/sec, among gate-passing candidates:
+Non-dominated on quality, peak memory, and median tokens/sec, among gate-passing candidates:
 
 - **qwen3:14b**: quality 0.917, 10190 MiB, 10.4 tok/s
 - **gemma3:4b**: quality 0.905, 4212 MiB, 25.2 tok/s
@@ -43,16 +43,16 @@ Dominated: qwen3:8b-split.
 
 ## Recommendation
 
-**gemma3:4b**. gemma3:4b holds quality 0.905, within 2% of the best (0.917 from qwen3:14b), at 4212 MiB peak VRAM versus 10190 MiB.
+**gemma3:4b**. gemma3:4b holds quality 0.905, within 2% of the best (0.917 from qwen3:14b), at 4212 MiB peak memory versus 10190 MiB.
 
-- qwen3:14b: same quality band but 5978 MiB more peak VRAM than gemma3:4b
-- qwen3:8b-split: same quality band but 888 MiB more peak VRAM than gemma3:4b
+- qwen3:14b: same quality band but 5978 MiB more peak memory than gemma3:4b
+- qwen3:8b-split: same quality band but 888 MiB more peak memory than gemma3:4b
 - gemma3:1b: failed gate scorers: json-schema (4 units)
 - gemma3-27b-q4:latest: did not run: oom-suspect during load/warmup at context 4096: model failed to load
 
 ## Methodology
 
-Each example ran 3 times at temperature 0 with a fixed seed, after one untimed warmup per model; models ran strictly one at a time with forced unload and a cooldown between candidates. Quality spread is the range of per-repetition means. VRAM is polled via nvidia-smi during load and generation; the peak is the highest sample. Measurement limits (polling resolution, warmup policy, determinism caveats, partial-offload detection) are documented in [docs/methodology.md](docs/methodology.md).
+Each example ran 3 times at temperature 0 with a fixed seed, after one untimed warmup per model; models ran strictly one at a time with forced unload and a cooldown between candidates. Quality spread is the range of per-repetition means. Memory is polled during load and generation (GPU memory via nvidia-smi); the peak is the highest sample. Measurement limits (polling resolution, warmup policy, determinism caveats, partial-offload detection) are documented in [docs/methodology.md](docs/methodology.md).
 
 ## Reproduce
 

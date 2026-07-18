@@ -81,7 +81,7 @@ describe('renderComparison', () => {
         makeAggregate('behind', { quality: 0.8, vram: 4000, tps: 20 }),
       ]),
     );
-    expect(text).toContain('pareto frontier (quality/VRAM/tok/s): front');
+    expect(text).toContain('pareto frontier (quality/memory/tok/s): front');
     expect(text).toContain('dominated: behind');
   });
 
@@ -104,7 +104,7 @@ describe('renderComparison', () => {
         vramUnavailableReason: 'nvidia-smi is not available on this machine, so VRAM was not measured',
       }),
     });
-    expect(text).toContain('VRAM not measured: nvidia-smi is not available');
+    expect(text).toContain('memory not measured: nvidia-smi is not available');
     expect(text).toMatch(/cpu-only.*n\/m/);
   });
 

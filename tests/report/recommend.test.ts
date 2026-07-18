@@ -88,7 +88,7 @@ describe('recommend', () => {
     expect(pickOf(result)).toBe('unmeasured-small');
     if (result.kind === 'recommended') {
       expect(result.reason).toContain('weights on disk');
-      expect(result.reason).toContain('peak VRAM was not measured');
+      expect(result.reason).toContain('peak memory was not measured');
     }
   });
 
@@ -105,7 +105,7 @@ describe('recommend', () => {
     expect(pickOf(result)).toBe('picked');
     if (result.kind === 'recommended') {
       const reasons = new Map(result.runnersUp.map((r) => [r.aggregate.candidate.modelName, r.reason]));
-      expect(reasons.get('costly')).toContain('4000 MiB more peak VRAM');
+      expect(reasons.get('costly')).toContain('4000 MiB more peak memory');
       expect(reasons.get('weak')).toContain('50.0% below the best');
       expect(reasons.get('exploded')).toContain('oom-suspect during load');
     }

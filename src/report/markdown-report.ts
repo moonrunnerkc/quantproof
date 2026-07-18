@@ -130,12 +130,12 @@ function paretoSection(data: ReportData): string[] {
   return [
     '## Pareto frontier',
     '',
-    'Non-dominated on quality, peak VRAM, and median tokens/sec, among gate-passing candidates:',
+    'Non-dominated on quality, peak memory, and median tokens/sec, among gate-passing candidates:',
     '',
     ...frontier.map(
       (p) =>
         `- **${p.aggregate.candidate.modelName}**: quality ${fmtScore(p.quality)}, ` +
-        `${p.vramMib !== null ? `${fmtMib(p.vramMib)} MiB` : p.aggregate.candidate.fitVerdict === 'not-applicable' ? 'VRAM not applicable' : 'VRAM not measured'}, ` +
+        `${p.vramMib !== null ? `${fmtMib(p.vramMib)} MiB` : p.aggregate.candidate.fitVerdict === 'not-applicable' ? 'memory not applicable' : 'memory not measured'}, ` +
         `${p.tokensPerSecond === null ? 'rate not measured' : `${fmtRate(p.tokensPerSecond)} tok/s`}`,
     ),
     ...(dominated.length > 0
@@ -190,7 +190,7 @@ export function renderMarkdownReport(data: ReportData): string {
     '',
     '## Results',
     '',
-    '| model | quant | quality (spread) | pass | TTFT ms (spread) | tok/s (spread) | peak VRAM MiB | predicted MiB (delta) | flags |',
+    '| model | quant | quality (spread) | pass | TTFT ms (spread) | tok/s (spread) | peak memory MiB | predicted MiB (delta) | flags |',
     '| --- | --- | --- | ---: | --- | --- | ---: | --- | --- |',
     ...data.aggregates.map((a) => resultsRow(a, footnotes.get(a) ?? [])),
     ...(allNotes.length > 0 ? ['', ...allNotes.map((f) => `- ${f.marker} ${f.text}`)] : []),
@@ -203,7 +203,7 @@ export function renderMarkdownReport(data: ReportData): string {
     '',
     api
       ? `Each example ran ${String(run.generation.runs_per_example)} time${run.generation.runs_per_example === 1 ? '' : 's'} at temperature ${String(run.generation.temperature)} over the streaming Messages API, after one untimed warmup request per model. The API has no sampler seed, so repetitions are compared byte for byte and flagged when they differ. Time to first token includes the network path to the API; token counts come from the API's own usage fields. What is and is not measured on this backend is documented in [docs/methodology.md](docs/methodology.md).`
-      : `Each example ran ${String(run.generation.runs_per_example)} time${run.generation.runs_per_example === 1 ? '' : 's'} at temperature ${String(run.generation.temperature)} with a fixed seed, after one untimed warmup per model; models ran strictly one at a time with forced unload and a cooldown between candidates. Quality spread is the range of per-repetition means. VRAM is polled via nvidia-smi during load and generation; the peak is the highest sample. Measurement limits (polling resolution, warmup policy, determinism caveats, partial-offload detection) are documented in [docs/methodology.md](docs/methodology.md).`,
+      : `Each example ran ${String(run.generation.runs_per_example)} time${run.generation.runs_per_example === 1 ? '' : 's'} at temperature ${String(run.generation.temperature)} with a fixed seed, after one untimed warmup per model; models ran strictly one at a time with forced unload and a cooldown between candidates. Quality spread is the range of per-repetition means. Memory is polled during load and generation (${run.gpuName?.includes('unified memory') === true ? 'resident backend process memory on Apple Silicon' : 'GPU memory via nvidia-smi'}); the peak is the highest sample. Measurement limits (polling resolution, warmup policy, determinism caveats, partial-offload detection) are documented in [docs/methodology.md](docs/methodology.md).`,
     '',
     '## Reproduce',
     '',

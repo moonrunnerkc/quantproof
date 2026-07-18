@@ -84,7 +84,7 @@ export function renderTerminalReport(input: ReportInput): string {
   lines.push(renderRow('pass rate', fmt(summary.passRate === null ? null : summary.passRate * 100, 1, '%')));
   lines.push(renderRow('ttft median', fmt(summary.ttftMedianMs, 0, ' ms')));
   lines.push(renderRow('tokens/sec median', fmt(summary.tokensPerSecondMedian, 1, '')));
-  lines.push(renderRow('peak vram', vramLine(input)));
+  lines.push(renderRow('peak memory', vramLine(input)));
   lines.push(renderRow('fit prediction', `${candidate.fitVerdict}${candidate.predictedPeakMib === null ? '' : `, predicted peak ${candidate.predictedPeakMib.toFixed(0)} MiB`}`));
   if (input.offloadSuspectReason !== null) {
     lines.push(renderRow('offload', `SUSPECTED CPU/GPU SPLIT: ${input.offloadSuspectReason}`));

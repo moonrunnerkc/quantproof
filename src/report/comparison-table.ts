@@ -131,7 +131,7 @@ export function renderComparison(data: ReportData): string {
       ? `${run.gpuName} (driver ${run.driverVersion ?? 'unknown'})`
       : reason.startsWith('API backend')
         ? reason
-        : `VRAM not measured: ${reason}`;
+        : `memory not measured: ${reason}`;
   const lines: string[] = [
     '',
     `${run.packName}: ${String(data.aggregates.length)} candidate${data.aggregates.length === 1 ? '' : 's'} | ${run.backendVersion} | ${gpu}`,
@@ -164,7 +164,7 @@ export function renderComparison(data: ReportData): string {
     ...wrapLine(
       frontier.length === 0
         ? 'pareto frontier: empty (no gate-passing candidates)'
-        : `pareto frontier (quality/VRAM/tok/s): ${frontier.map((p) => p.aggregate.candidate.modelName).join(', ')}` +
+        : `pareto frontier (quality/memory/tok/s): ${frontier.map((p) => p.aggregate.candidate.modelName).join(', ')}` +
             (data.pareto.dominated.length > 0
               ? ` | dominated: ${data.pareto.dominated.map((p) => p.aggregate.candidate.modelName).join(', ')}`
               : ''),
