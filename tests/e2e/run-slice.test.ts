@@ -35,7 +35,7 @@ describe.skipIf(!ollamaUp)('quantproof run against live ollama', () => {
     expect(report).toContain(`invoice-extraction x ${MODEL}`);
     expect(report).toContain('quality (mean score)');
     expect(report).toContain('ttft median');
-    expect(report).toContain('peak vram');
+    expect(report).toContain('peak memory');
     expect(report).toContain('ollama');
     expect(report).toContain('repro: quantproof run');
 
