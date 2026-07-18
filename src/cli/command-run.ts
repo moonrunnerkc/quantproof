@@ -5,9 +5,7 @@
 
 import { OllamaAdapter } from '../backends/ollama-adapter.js';
 import type { ModelDescriptor } from '../backends/backend-adapter.js';
-import {
-  API_BACKEND_VRAM_REASON, apiNoopProbe, createAdapter,
-} from '../backends/backend-select.js';
+import { createAdapter } from '../backends/backend-select.js';
 import { DEFAULT_RUN_CONFIG, loadRunConfig } from '../catalog/run-config.js';
 import { notApplicableFit } from '../catalog/fit-predictor.js';
 import { resolveCandidates } from '../catalog/model-resolver.js';
@@ -25,7 +23,7 @@ import { checkExpectedValues } from '../scoring/plan-check.js';
 import { listScorers } from '../scoring/scorer-registry.js';
 import { loadTaskPack, TaskPackError } from '../tasks/task-loader.js';
 import type { LoadedTaskPack } from '../tasks/task-loader.js';
-import { queryGpuIdentity, queryVramOnce } from '../telemetry/vram-probe.js';
+import { selectMemoryProbes } from '../telemetry/probe-select.js';
 
 /** Options parsed from the command line. */
 export interface RunCommandOptions {
@@ -91,8 +89,9 @@ export async function runCommand(options: RunCommandOptions): Promise<string> {
     );
   }
 
-  const gpu = config.backend === 'anthropic' ? null : queryGpuIdentity();
-  const freeVramMib = config.backend === 'anthropic' ? null : (queryVramOnce()?.freeMib ?? null);
+  const probes = selectMemoryProbes(config.backend);
+  const gpu = probes.gpu;
+  const freeVramMib = probes.sampleOnce()?.freeMib ?? null;
   const assessments =
     adapter instanceof OllamaAdapter
       ? await assessCandidates(adapter, descriptors, pack.manifest.generation.context, freeVramMib)
@@ -126,23 +125,18 @@ export async function runCommand(options: RunCommandOptions): Promise<string> {
         {
           backendVersion,
           gpu,
-          vramUnavailableReason:
-            config.backend === 'anthropic'
-              ? API_BACKEND_VRAM_REASON
-              : gpu === null
-                ? 'nvidia-smi is not available on this machine, so VRAM was not measured'
-                : null,
+          vramUnavailableReason: probes.unavailableReason,
         },
       );
       const sweepOptions: SweepOptions = {
         adapter,
         store,
+        startProbe: probes.startProbe,
+        sampleVram: probes.sampleOnce,
         onProgress: (line) => {
           console.log(`  ${line}`);
         },
-        ...(config.backend === 'anthropic'
-          ? { startProbe: apiNoopProbe, sampleVram: () => null, cooldownMs: 0 }
-          : {}),
+        ...(config.backend === 'anthropic' ? { cooldownMs: 0 } : {}),
       };
       const outcome = await executeSweep(pack, prepared, sweepOptions);
       const units = store.listUnitResults(outcome.run.id);

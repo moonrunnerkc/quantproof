@@ -14,7 +14,7 @@ import type { ModelInfoSource } from '../catalog/gguf-metadata.js';
 import { resolveCandidates } from '../catalog/model-resolver.js';
 import { assessCandidates } from '../orchestrator/run-planner.js';
 import { fmtMib, renderColumns, wrapLine } from '../report/format.js';
-import { queryVramOnce } from '../telemetry/vram-probe.js';
+import { selectMemoryProbes } from '../telemetry/probe-select.js';
 
 /** Options parsed from the command line. */
 export interface ModelsCommandOptions {
@@ -65,15 +65,15 @@ export async function modelsCommand(options: ModelsCommandOptions): Promise<stri
   const config = options.config === undefined ? DEFAULT_RUN_CONFIG : loadRunConfig(options.config);
   const resolved = await resolveCandidates(adapter, config);
   const context = options.context ?? DEFAULT_PREVIEW_CONTEXT;
-  const snapshot = queryVramOnce();
-  const freeVramMib = snapshot?.freeMib ?? null;
+  const probes = selectMemoryProbes('ollama');
+  const freeVramMib = probes.sampleOnce()?.freeMib ?? null;
   const assessments = await assessCandidates(adapter, resolved.candidates, context, freeVramMib);
 
   const lines: string[] = [
     `${String(assessments.length)} candidate${assessments.length === 1 ? '' : 's'} | ${backendVersion} | ` +
       (freeVramMib === null
-        ? 'free VRAM not measurable (no nvidia-smi), so fit verdicts are "unknown" and a sweep will attempt every candidate'
-        : `${fmtMib(freeVramMib)} MiB VRAM free`),
+        ? 'free memory not measurable (no nvidia-smi, not Apple Silicon macOS), so fit verdicts are "unknown" and a sweep will attempt every candidate'
+        : `${fmtMib(freeVramMib)} MiB free for models${probes.source === 'unified-memory' ? ' (75% unified-memory budget minus resident backend memory)' : ''}`),
     `fit predicted at context ${String(context)}; a sweep uses each pack's declared context (preview another with --context)`,
     '',
   ];

@@ -4,7 +4,8 @@
  * original plan and config exactly.
  */
 
-import { apiNoopProbe, backendKindOf, createAdapter } from '../backends/backend-select.js';
+import { backendKindOf, createAdapter } from '../backends/backend-select.js';
+import { selectMemoryProbes } from '../telemetry/probe-select.js';
 import { buildResume, findResumableRun, verifyNoDrift } from '../orchestrator/recovery.js';
 import { executeSweep } from '../orchestrator/run-executor.js';
 import type { SweepOptions } from '../orchestrator/run-executor.js';
@@ -61,13 +62,16 @@ export async function resumeCommand(options: ResumeCommandOptions): Promise<stri
           `${String(prepared.entries.reduce((n, e) => n + e.units.length, 0))} pending units`,
       );
       const kind = backendKindOf(run.backendVersion);
+      const probes = selectMemoryProbes(kind);
       const sweepOptions: SweepOptions = {
         adapter: createAdapter(kind, options.baseUrl),
         store,
+        startProbe: probes.startProbe,
+        sampleVram: probes.sampleOnce,
         onProgress: (line) => {
           console.log(`  ${line}`);
         },
-        ...(kind === 'anthropic' ? { startProbe: apiNoopProbe, sampleVram: () => null, cooldownMs: 0 } : {}),
+        ...(kind === 'anthropic' ? { cooldownMs: 0 } : {}),
       };
       const outcome = await executeSweep(pack, prepared, sweepOptions);
       const units = store.listUnitResults(run.id);
