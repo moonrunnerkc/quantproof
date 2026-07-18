@@ -6,7 +6,9 @@
  */
 
 import { API_BACKEND_VRAM_REASON, apiNoopProbe } from '../backends/backend-select.js';
+import { DEFAULT_RAPID_MLX_URL } from '../backends/rapid-mlx-adapter.js';
 import type { BackendKind } from '../catalog/run-config.js';
+import { startRapidMlxProbe } from './rapid-mlx-probe.js';
 import {
   queryUnifiedIdentity, queryUnifiedMemoryOnce, startUnifiedMemoryProbe,
 } from './unified-memory-probe.js';
@@ -15,7 +17,7 @@ import { queryGpuIdentity, queryVramOnce, startVramProbe } from './vram-probe.js
 import type { GpuInfo, VramProbe, VramSnapshot } from './vram-probe.js';
 
 /** Where a run's memory numbers come from. */
-export type MemorySource = 'nvidia-smi' | 'unified-memory' | 'api' | 'none';
+export type MemorySource = 'nvidia-smi' | 'unified-memory' | 'rapid-mlx-status' | 'api' | 'none';
 
 /** Rendered when no telemetry source works on this machine. */
 export const NO_TELEMETRY_REASON =
@@ -41,6 +43,8 @@ const PROCESS_HINTS: Readonly<Partial<Record<BackendKind, readonly string[]>>> =
 export interface ProbeSelectOptions {
   readonly nvidiaBinary?: string;
   readonly unified?: UnifiedProbeOptions;
+  /** Rapid-MLX server URL; the sweep's --base-url when given. */
+  readonly rapidMlxUrl?: string;
 }
 
 /**
@@ -59,6 +63,21 @@ export function selectMemoryProbes(kind: BackendKind, options: ProbeSelectOption
       gpu: null,
       unavailableReason: API_BACKEND_VRAM_REASON,
       startProbe: apiNoopProbe,
+      sampleOnce: () => null,
+    };
+  }
+  if (kind === 'rapid-mlx') {
+    // MLX Metal buffers do not show in process RSS, so the server's
+    // own /v1/status accounting is the only honest measurement. The
+    // one-shot sampler returns null: fit is unpredictable for this
+    // backend and its single resident model never unloads, so neither
+    // consumer of the snapshot applies.
+    const url = options.rapidMlxUrl ?? DEFAULT_RAPID_MLX_URL;
+    return {
+      source: 'rapid-mlx-status',
+      gpu: queryUnifiedIdentity(options.unified),
+      unavailableReason: null,
+      startProbe: () => startRapidMlxProbe(url, options.unified === undefined ? {} : { identity: options.unified }),
       sampleOnce: () => null,
     };
   }

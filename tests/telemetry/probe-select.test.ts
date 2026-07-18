@@ -60,6 +60,14 @@ describe('selectMemoryProbes', () => {
     expect(result.available).toBe(false);
   });
 
+  it('polls the rapid-mlx server status instead of process memory for that backend', () => {
+    const set = selectMemoryProbes('rapid-mlx', { nvidiaBinary: missingNvidia, unified });
+    expect(set.source).toBe('rapid-mlx-status');
+    expect(set.gpu?.name).toBe('Apple M5 Max unified memory');
+    expect(set.unavailableReason).toBeNull();
+    expect(set.sampleOnce()).toBeNull();
+  });
+
   it('measures nothing for the api backend, by design', async () => {
     const set = selectMemoryProbes('anthropic', { nvidiaBinary: nvidia, unified });
     expect(set.source).toBe('api');
