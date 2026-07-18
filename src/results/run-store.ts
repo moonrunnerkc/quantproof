@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS runs (
   scorer_name TEXT NOT NULL, generation_json TEXT NOT NULL,
   backend_version TEXT NOT NULL, gpu_name TEXT, driver_version TEXT,
   vram_available INTEGER NOT NULL, vram_unavailable_reason TEXT,
+  provenance_json TEXT,
   plan_json TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS candidates (
@@ -118,6 +119,12 @@ export class RunStore {
       db.pragma('journal_mode = WAL');
       db.pragma('foreign_keys = ON');
       db.exec(SCHEMA);
+      // Databases created before the provenance column gain it in
+      // place; CREATE TABLE IF NOT EXISTS never alters existing tables.
+      const runColumns = db.pragma('table_info(runs)') as { name: string }[];
+      if (!runColumns.some((column) => column.name === 'provenance_json')) {
+        db.exec('ALTER TABLE runs ADD COLUMN provenance_json TEXT');
+      }
       return new RunStore(db);
     } catch (err) {
       const code = err instanceof Error && 'code' in err ? String((err as { code: unknown }).code) : '';
@@ -140,13 +147,15 @@ export class RunStore {
       .prepare(
         `INSERT INTO runs (id, created_at_ms, pack_name, pack_dir, task_type, scorer_name,
          generation_json, backend_version, gpu_name, driver_version, vram_available,
-         vram_unavailable_reason, plan_json)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         vram_unavailable_reason, provenance_json, plan_json)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         run.id, run.createdAtMs, run.packName, run.packDir, run.taskType, run.scorerName,
         JSON.stringify(run.generation), run.backendVersion, run.gpuName, run.driverVersion,
-        run.vramAvailable ? 1 : 0, run.vramUnavailableReason, JSON.stringify(run.plan),
+        run.vramAvailable ? 1 : 0, run.vramUnavailableReason,
+        run.packProvenance === null ? null : JSON.stringify(run.packProvenance),
+        JSON.stringify(run.plan),
       );
   }
 

@@ -99,6 +99,7 @@ export function prepareSweepJournal(
     driverVersion: env.gpu?.driverVersion ?? null,
     vramAvailable: env.gpu !== null,
     vramUnavailableReason: env.vramUnavailableReason,
+    packProvenance: pack.manifest.provenance,
     plan: snapshot,
   };
   store.createRun(run);

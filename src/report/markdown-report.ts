@@ -7,7 +7,7 @@
  */
 
 import type { CandidateAggregate } from './aggregate.js';
-import { fmtMib, fmtMs, fmtRate, fmtScore, fmtSignedPercent, fmtWithSpread } from './format.js';
+import { fmtMib, fmtMs, fmtRate, fmtScore, fmtSignedPercent, fmtWithSpread, provenanceLabel } from './format.js';
 import type { ReportData } from './report-data.js';
 import { isApiBackend } from '../backends/backend-select.js';
 import type { RunRecord } from '../results/record-types.js';
@@ -114,6 +114,7 @@ function environmentSection(run: RunRecord, aggregates: readonly CandidateAggreg
       ? `not measured (${run.vramUnavailableReason ?? 'no GPU telemetry'})`
       : `${run.gpuName}, driver ${run.driverVersion ?? 'unknown'}`;
   const g = run.generation;
+  const drafted = provenanceLabel(run.packProvenance);
   return [
     '## Environment',
     '',
@@ -121,6 +122,7 @@ function environmentSection(run: RunRecord, aggregates: readonly CandidateAggreg
     `- GPU: ${gpu}`,
     `- Backend: ${run.backendVersion}`,
     `- Task pack: ${run.packName} (scorer ${run.scorerName}), fingerprint \`${run.plan.packFingerprint.slice(0, 12)}\``,
+    ...(drafted === null ? [] : [`- **Drafted pack**: ${drafted}`]),
     `- Generation: context ${String(g.context)}, max_tokens ${String(g.max_tokens)}, temperature ${String(g.temperature)}, seed ${String(g.seed)}, ${String(g.runs_per_example)} runs per example`,
     '',
     '| model | quant | params | weights MiB | digest |',

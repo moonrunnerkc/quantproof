@@ -57,6 +57,25 @@ export function fmtWithSpread(
  * @returns One or more lines, each within the width (except a single
  *   word longer than the width, which stays intact).
  */
+/**
+ * The label every renderer shows for an unreviewed drafted pack.
+ *
+ * @param provenance - The run's pack provenance, or null.
+ * @returns The warning line, or null for hand-written or reviewed
+ *   packs (nothing to disclose).
+ */
+export function provenanceLabel(
+  provenance: { readonly drafted_by: string; readonly source: string; readonly drafted_at: string; readonly reviewed: boolean } | null,
+): string | null {
+  if (provenance === null || provenance.reviewed) {
+    return null;
+  }
+  return (
+    `pack drafted by ${provenance.drafted_by} from ${provenance.source} on ${provenance.drafted_at}; ` +
+    'expected values are model-authored and unreviewed, so quality measures agreement with the drafter (set provenance.reviewed in task.yaml after checking)'
+  );
+}
+
 export function wrapLine(text: string, width = 100, continuationIndent = '    '): string[] {
   const words = text.split(' ');
   const lines: string[] = [];

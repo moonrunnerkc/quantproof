@@ -5,6 +5,7 @@
  */
 
 import type { RunSummary } from './aggregate.js';
+import { provenanceLabel } from './format.js';
 import type { CandidateRecord, RunRecord } from '../results/record-types.js';
 import type { SweepOutcome } from '../orchestrator/run-executor.js';
 import type { VramProbeResult } from '../telemetry/vram-probe.js';
@@ -112,6 +113,10 @@ export function renderTerminalReport(input: ReportInput): string {
     `  env: ${run.backendVersion} | ${candidate.modelName}@${candidate.digest.slice(0, 12)}` +
       ` | ${candidate.quantization ?? 'quant unknown'} | ${gpu}`,
   );
+  const drafted = provenanceLabel(run.packProvenance);
+  if (drafted !== null) {
+    lines.push(`  DRAFTED PACK: ${drafted}`);
+  }
   lines.push(
     `  repro: quantproof run --pack ${run.packDir}` +
       ` (seed ${String(run.generation.seed)}, temp ${String(run.generation.temperature)},` +

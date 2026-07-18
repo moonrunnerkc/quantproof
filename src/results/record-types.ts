@@ -5,7 +5,7 @@
  * shapes; the store persists them verbatim.
  */
 
-import type { GenerationParams } from '../tasks/task-schema.js';
+import type { GenerationParams, PackProvenance } from '../tasks/task-schema.js';
 
 /**
  * What resume needs to rebuild a run exactly: how the run was invoked
@@ -45,6 +45,12 @@ export interface RunRecord {
   /** False when the VRAM probe could not run; reason says why. */
   readonly vramAvailable: boolean;
   readonly vramUnavailableReason: string | null;
+  /**
+   * Drafting provenance carried from the pack manifest; reports label
+   * results until provenance.reviewed is true. Null for hand-written
+   * packs.
+   */
+  readonly packProvenance: PackProvenance | null;
   /** Invocation and fingerprints, for exact resume. */
   readonly plan: PlanSnapshot;
 }

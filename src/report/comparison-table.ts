@@ -8,7 +8,7 @@
 import type { CandidateAggregate } from './aggregate.js';
 import type { UnitResult } from '../results/record-types.js';
 import {
-  fmtMib, fmtMs, fmtRate, fmtScore, fmtSignedPercent, fmtWithSpread, renderColumns, wrapLine,
+  fmtMib, fmtMs, fmtRate, fmtScore, fmtSignedPercent, fmtWithSpread, provenanceLabel, renderColumns, wrapLine,
 } from './format.js';
 import type { ReportData } from './report-data.js';
 
@@ -136,6 +136,10 @@ export function renderComparison(data: ReportData): string {
     '',
     `${run.packName}: ${String(data.aggregates.length)} candidate${data.aggregates.length === 1 ? '' : 's'} | ${run.backendVersion} | ${gpu}`,
   ];
+  const drafted = provenanceLabel(run.packProvenance);
+  if (drafted !== null) {
+    lines.push(`DRAFTED PACK: ${drafted}`);
+  }
   for (const note of data.notes) {
     lines.push(`note: ${note}`);
   }

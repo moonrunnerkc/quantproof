@@ -42,6 +42,10 @@ export function runFromRow(row: Row): RunRecord {
     driverVersion: row['driver_version'] as string | null,
     vramAvailable: row['vram_available'] === 1,
     vramUnavailableReason: row['vram_unavailable_reason'] as string | null,
+    packProvenance:
+      row['provenance_json'] == null
+        ? null
+        : (JSON.parse(row['provenance_json'] as string) as RunRecord['packProvenance']),
     plan: JSON.parse(row['plan_json'] as string) as RunRecord['plan'],
   };
 }

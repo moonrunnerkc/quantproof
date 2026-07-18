@@ -177,3 +177,19 @@ describe('reproductionCommand', () => {
     );
   });
 });
+
+describe('renderMarkdownReport provenance label', () => {
+  it('discloses an unreviewed drafted pack in the environment block', () => {
+    const data = caseStudyData();
+    const rendered = renderMarkdownReport({
+      ...data,
+      run: runRecord({
+        packProvenance: {
+          source: 'lwt-common-tasks.md', source_sha256: 'a'.repeat(64),
+          drafted_by: 'gemma3:4b (ollama 0.23.1)', drafted_at: '2026-07-17', reviewed: false,
+        },
+      }),
+    });
+    expect(rendered).toContain('**Drafted pack**: pack drafted by gemma3:4b (ollama 0.23.1) from lwt-common-tasks.md');
+  });
+});

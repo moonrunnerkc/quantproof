@@ -58,7 +58,7 @@ describe('verifyNoDrift', () => {
       id: 'run-1', createdAtMs: 0, packName: 'x', packDir, taskType: 't', scorerName: 'exact-label',
       generation: { context: 2048, max_tokens: 8, temperature: 0, seed: 42, runs_per_example: 1 },
       backendVersion: 'fake', gpuName: null, driverVersion: null,
-      vramAvailable: false, vramUnavailableReason: null,
+      vramAvailable: false, vramUnavailableReason: null, packProvenance: null,
       plan: {
         explicitModel: null, configPath,
         configFingerprint: configFingerprint(configPath),

@@ -158,3 +158,36 @@ describe('buildReportData', () => {
     }
   });
 });
+
+describe('renderComparison provenance label', () => {
+  const provenance = {
+    source: 'lwt-common-tasks.md',
+    source_sha256: 'a'.repeat(64),
+    drafted_by: 'gemma3:4b (ollama 0.23.1)',
+    drafted_at: '2026-07-17',
+    reviewed: false,
+  };
+
+  it('labels an unreviewed drafted pack loudly in the header', () => {
+    const text = renderComparison({
+      run: runRecord({ packProvenance: provenance }),
+      aggregates: [makeAggregate('gemma3:1b', { quality: 0.7, vram: 1900 })],
+      pareto: paretoFrontier([makeAggregate('gemma3:1b', { quality: 0.7, vram: 1900 })]),
+      recommendation: recommend([makeAggregate('gemma3:1b', { quality: 0.7, vram: 1900 })]),
+      notes: [],
+    });
+    expect(text).toContain('DRAFTED PACK: pack drafted by gemma3:4b (ollama 0.23.1) from lwt-common-tasks.md');
+    expect(text).toContain('agreement with the drafter');
+  });
+
+  it('drops the label once provenance is marked reviewed', () => {
+    const text = renderComparison({
+      run: runRecord({ packProvenance: { ...provenance, reviewed: true } }),
+      aggregates: [makeAggregate('gemma3:1b', { quality: 0.7, vram: 1900 })],
+      pareto: paretoFrontier([makeAggregate('gemma3:1b', { quality: 0.7, vram: 1900 })]),
+      recommendation: recommend([makeAggregate('gemma3:1b', { quality: 0.7, vram: 1900 })]),
+      notes: [],
+    });
+    expect(text).not.toContain('DRAFTED PACK');
+  });
+});

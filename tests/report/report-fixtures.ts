@@ -65,7 +65,7 @@ export function runRecord(overrides: Partial<RunRecord> = {}): RunRecord {
     generation: { context: 4096, max_tokens: 512, temperature: 0, seed: 42, runs_per_example: 3 },
     backendVersion: 'ollama 0.23.1',
     gpuName: 'NVIDIA GeForce RTX 5070', driverVersion: '580.65.06',
-    vramAvailable: true, vramUnavailableReason: null,
+    vramAvailable: true, vramUnavailableReason: null, packProvenance: null,
     plan: {
       explicitModel: null, configPath: null, configFingerprint: null,
       packFingerprint: 'pack-fp', limit: null, force: false,

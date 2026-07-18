@@ -29,6 +29,7 @@ const run: RunRecord = {
   driverVersion: null,
   vramAvailable: false,
   vramUnavailableReason: 'nvidia-smi is not available on this machine, so VRAM was not measured',
+  packProvenance: null,
   plan: {
     explicitModel: null,
     configPath: '/cfg/quantproof.yaml',
@@ -192,6 +193,41 @@ describe('RunStore', () => {
     store.completeWorkUnit({ ...generation('unit-1'), output: rawOutput }, score('unit-1'));
     const readBack = store.listUnitResults('run-1').find((r) => r.unit.id === 'unit-1');
     expect(readBack?.generation?.output).toBe(rawOutput);
+    store.close();
+  });
+});
+
+describe('RunStore provenance', () => {
+  it('round-trips pack provenance on the run record', () => {
+    const store = RunStore.open(tempDb());
+    const provenance = {
+      source: 'notes.md', source_sha256: 'a'.repeat(64),
+      drafted_by: 'gemma3:4b (ollama 0.23.1)', drafted_at: '2026-07-17', reviewed: false,
+    };
+    store.createRun({ ...run, id: 'run-prov', packProvenance: provenance });
+    const loaded = store.listRuns().find((r) => r.id === 'run-prov');
+    expect(loaded?.packProvenance).toEqual(provenance);
+    store.close();
+  });
+
+  it('adds the provenance column to a database created before it existed', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'quantproof-store-'));
+    dirs.push(dir);
+    const dbPath = join(dir, 'old.db');
+    const { default: Database } = await import('better-sqlite3');
+    const legacy = new Database(dbPath);
+    legacy.exec(`CREATE TABLE runs (
+      id TEXT PRIMARY KEY, created_at_ms INTEGER NOT NULL,
+      pack_name TEXT NOT NULL, pack_dir TEXT NOT NULL, task_type TEXT NOT NULL,
+      scorer_name TEXT NOT NULL, generation_json TEXT NOT NULL,
+      backend_version TEXT NOT NULL, gpu_name TEXT, driver_version TEXT,
+      vram_available INTEGER NOT NULL, vram_unavailable_reason TEXT,
+      plan_json TEXT NOT NULL
+    );`);
+    legacy.close();
+    const store = RunStore.open(dbPath);
+    store.createRun({ ...run, id: 'run-migrated' });
+    expect(store.listRuns().find((r) => r.id === 'run-migrated')?.packProvenance).toBeNull();
     store.close();
   });
 });
