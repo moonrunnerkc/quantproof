@@ -6,6 +6,7 @@
  */
 
 import { Command } from 'commander';
+import { ingestCommand } from './command-ingest.js';
 import { initCommand } from './command-init.js';
 import { modelsCommand } from './command-models.js';
 import { reportCommand } from './command-report.js';
@@ -97,6 +98,23 @@ program
   .action(async (dir: string | undefined, options: { name?: string; type?: string; scorer?: string; yes?: boolean }) => {
     try {
       await initCommand({ ...options, ...(dir === undefined ? {} : { dir }) });
+    } catch (err) {
+      console.error(err instanceof Error ? err.message : String(err));
+      process.exitCode = 1;
+    }
+  });
+
+program
+  .command('ingest')
+  .description('Draft a runnable task pack from a freeform document using a local model')
+  .argument('<file>', 'source document (markdown or plain text)')
+  .argument('[dir]', 'target pack directory; defaults to ./<drafted-name>')
+  .option('--model <name>', 'drafting model; defaults to the largest local model that fits')
+  .option('--config <file>', 'run config choosing the backend')
+  .option('--base-url <url>', 'backend endpoint override')
+  .action(async (source: string, dir: string | undefined, options: { model?: string; config?: string; baseUrl?: string }) => {
+    try {
+      await ingestCommand({ ...options, source, ...(dir === undefined ? {} : { dir }) });
     } catch (err) {
       console.error(err instanceof Error ? err.message : String(err));
       process.exitCode = 1;

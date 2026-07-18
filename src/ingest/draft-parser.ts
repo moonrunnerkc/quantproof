@@ -181,3 +181,51 @@ export function parseDraft(output: string, knownScorers: readonly string[]): Dra
     draft: { name, type: type.trim(), scorer, scorerParams: params, prompt, examples },
   };
 }
+
+/**
+ * Best-effort recovery of a failed draft so it can still be written to
+ * disk for hand-fixing: invalid pieces get placeholders, structurally
+ * broken examples are dropped. Returns null when the output holds no
+ * JSON object at all, the one case with nothing to salvage.
+ *
+ * @param output - Raw model output that failed parseDraft.
+ * @param knownScorers - Registered scorer names, for the fallback.
+ * @returns A writable draft, or null.
+ */
+export function salvageDraft(output: string, knownScorers: readonly string[]): PackDraft | null {
+  const extraction = extractJson(output);
+  if (!extraction.ok || !isRecord(extraction.value)) {
+    return null;
+  }
+  const raw = extraction.value;
+  const rawName = raw['name'];
+  const name = typeof rawName === 'string' && kebab(rawName) !== '' ? kebab(rawName) : 'drafted-task';
+  const type = typeof raw['type'] === 'string' && raw['type'].trim() !== '' ? raw['type'].trim() : 'unknown';
+  const scorer =
+    typeof raw['scorer'] === 'string' && knownScorers.includes(raw['scorer'])
+      ? raw['scorer']
+      : (knownScorers[0] ?? 'exact-label');
+  const prompt =
+    typeof raw['prompt'] === 'string' && raw['prompt'].includes('{{input}}')
+      ? raw['prompt']
+      : 'Replace this drafted prompt; it must contain {{input}}.\n\nInput:\n{{input}}';
+  const examples: DraftExample[] = [];
+  if (Array.isArray(raw['examples'])) {
+    const seen = new Set<string>();
+    for (const entry of raw['examples'] as unknown[]) {
+      if (isRecord(entry) && typeof entry['input'] === 'string' && entry['input'].trim() !== '' &&
+          'expected' in entry && !seen.has(entry['input'])) {
+        seen.add(entry['input']);
+        examples.push({ input: entry['input'], expected: entry['expected'] });
+      }
+    }
+  }
+  return {
+    name,
+    type,
+    scorer,
+    scorerParams: isRecord(raw['scorer_params']) ? raw['scorer_params'] : {},
+    prompt,
+    examples,
+  };
+}
