@@ -129,6 +129,10 @@ of each section.
 
 - Spec amended first (2026-07-17), per the standing rule that build-plan.md wins disagreements: ingest (5.9) and memory-measured-everywhere (5.5 rewrite) are now spec, with gates in section 13. Driver: first-user friction, authoring the pack was the wall and "not measured" was a shrug where a number belongs.
 
+- System-memory probe (2026-07-17): the fallback when no GPU telemetry exists measures the backend's summed process RSS (same ps sampling the unified probe validated against Ollama's accounting, now shared in ps-rss-sampler) with the fit budget from /proc MemAvailable, the kernel's own answer to "how much can a new load take". Verdicts on this box went from five "unknown" to fits/does-not-fit that match reality (the 27B that OOM'd yesterday now predicts does-not-fit up front). Identity renders as "system RAM (driver kernel <release>)", following the unified probe's "driver macOS 15.5" convention.
+- The ps sampler was extracted at two call sites, ahead of the three-repetition rule: the two probes measure the identical thing by construction (in-flight guard, decimation, bounded stop wait), so a second copy would be duplicated subtlety, not coincidence.
+- Build script now restores the exec bit on dist/cli/main.js after tsc: a rebuild after npm link silently produced "Permission denied" on the linked binary (tsc rewrites the file without the bit npm set at link time). Found by hitting it, fixed portably with a node one-liner.
+
 ## Deferred
 
 - Word-number parsing ("forty-two") for numeric-tolerance.

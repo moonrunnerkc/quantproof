@@ -28,8 +28,8 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
-    "prepack": "tsc -p tsconfig.build.json",
+    "build": "tsc -p tsconfig.build.json && node -e \"fs.chmodSync('dist/cli/main.js', 0o755)\"",
+    "prepack": "tsc -p tsconfig.build.json && node -e \"fs.chmodSync('dist/cli/main.js', 0o755)\"",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "test": "vitest run",
