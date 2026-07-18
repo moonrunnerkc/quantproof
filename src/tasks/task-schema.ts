@@ -28,6 +28,26 @@ export interface GateDeclaration {
   readonly scorer_params: Readonly<Record<string, unknown>>;
 }
 
+/**
+ * Provenance of a machine-drafted pack: who authored the expected
+ * values and from what. Present on packs written by `quantproof
+ * ingest`; reports label results from unreviewed drafts because scores
+ * against model-authored expected values measure agreement with the
+ * drafting model until a human checks them.
+ */
+export interface PackProvenance {
+  /** Source document the pack was drafted from, as given. */
+  readonly source: string;
+  /** sha256 of the source document at drafting time. */
+  readonly source_sha256: string;
+  /** Drafting model and backend, e.g. "gemma3:4b (ollama 0.23.1)". */
+  readonly drafted_by: string;
+  /** ISO date of the drafting run. */
+  readonly drafted_at: string;
+  /** Set true after a human reviews the examples; clears the label. */
+  readonly reviewed: boolean;
+}
+
 /** A validated task.yaml manifest. Paths are as written, unresolved. */
 export interface TaskManifest {
   readonly name: string;
@@ -40,6 +60,8 @@ export interface TaskManifest {
   /** Path to the examples directory, relative to the pack dir. */
   readonly examples_dir: string;
   readonly gates: readonly GateDeclaration[];
+  /** Drafting provenance; null for hand-written packs. */
+  readonly provenance: PackProvenance | null;
 }
 
 /** Outcome of manifest validation: a manifest or every error found. */
@@ -184,6 +206,37 @@ function checkGates(
   return gates;
 }
 
+function checkProvenance(
+  errors: string[],
+  source: Record<string, unknown>,
+): PackProvenance | null {
+  const raw = source['provenance'];
+  if (raw === undefined) {
+    return null;
+  }
+  if (!isRecord(raw)) {
+    errors.push(
+      '"provenance" must be a mapping with source, source_sha256, drafted_by, drafted_at, and reviewed; remove it or fix it in task.yaml',
+    );
+    return null;
+  }
+  const hint = (field: string): string =>
+    `provenance.${field} records how the pack was drafted; see docs/task-packs.md`;
+  const src = checkString(errors, raw, 'source', hint('source'));
+  const sha = checkString(errors, raw, 'source_sha256', hint('source_sha256'));
+  const draftedBy = checkString(errors, raw, 'drafted_by', hint('drafted_by'));
+  const draftedAt = checkString(errors, raw, 'drafted_at', hint('drafted_at'));
+  const reviewed = raw['reviewed'] ?? false;
+  if (typeof reviewed !== 'boolean') {
+    errors.push('"provenance.reviewed" must be true or false; set it to true once the examples are human-checked');
+    return null;
+  }
+  if (src === undefined || sha === undefined || draftedBy === undefined || draftedAt === undefined) {
+    return null;
+  }
+  return { source: src, source_sha256: sha, drafted_by: draftedBy, drafted_at: draftedAt, reviewed };
+}
+
 /**
  * Validates a parsed task.yaml document against the manifest spec.
  *
@@ -218,6 +271,7 @@ export function validateManifest(
   const promptTemplate = checkString(errors, raw, 'prompt_template', 'point it at the prompt file, e.g. "./prompt.md"');
   const examplesDir = checkString(errors, raw, 'examples_dir', 'point it at the examples directory, e.g. "./examples"');
   const gates = checkGates(errors, raw, knownScorers);
+  const provenance = checkProvenance(errors, raw);
 
   if (
     errors.length > 0 ||
@@ -242,6 +296,7 @@ export function validateManifest(
       prompt_template: promptTemplate,
       examples_dir: examplesDir,
       gates,
+      provenance,
     },
   };
 }

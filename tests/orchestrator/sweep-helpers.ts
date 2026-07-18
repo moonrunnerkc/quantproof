@@ -27,6 +27,7 @@ export function tinyPack(runsPerExample = 1): LoadedTaskPack {
       prompt_template: './prompt.md',
       examples_dir: './examples',
       gates: [],
+      provenance: null,
     },
     promptTemplate: 'Answer yes or no: {{input}}',
     examples: [

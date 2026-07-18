@@ -101,3 +101,41 @@ describe('validateManifest', () => {
     expect(!result.ok && result.errors.length).toBeGreaterThanOrEqual(8);
   });
 });
+
+describe('validateManifest provenance', () => {
+  const provenance = {
+    source: 'notes.md',
+    source_sha256: 'a'.repeat(64),
+    drafted_by: 'gemma3:4b (ollama 0.23.1)',
+    drafted_at: '2026-07-17',
+    reviewed: false,
+  };
+
+  it('is null for hand-written packs', () => {
+    const result = validateManifest(valid, SCORERS);
+    expect(result.ok && result.manifest.provenance).toBeNull();
+  });
+
+  it('accepts a complete provenance block', () => {
+    const result = validateManifest({ ...valid, provenance }, SCORERS);
+    expect(result.ok && result.manifest.provenance).toEqual(provenance);
+  });
+
+  it('defaults reviewed to false when absent', () => {
+    const { reviewed, ...rest } = provenance;
+    void reviewed;
+    const result = validateManifest({ ...valid, provenance: rest }, SCORERS);
+    expect(result.ok && result.manifest.provenance?.reviewed).toBe(false);
+  });
+
+  it('rejects a provenance block missing its drafting fields', () => {
+    const errors = errorsFor({ provenance: { source: 'notes.md' } });
+    expect(errors.some((e) => e.includes('source_sha256'))).toBe(true);
+    expect(errors.some((e) => e.includes('drafted_by'))).toBe(true);
+  });
+
+  it('rejects a non-boolean reviewed flag with the fix', () => {
+    const errors = errorsFor({ provenance: { ...provenance, reviewed: 'yes' } });
+    expect(errors.some((e) => e.includes('true once the examples are human-checked'))).toBe(true);
+  });
+});
