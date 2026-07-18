@@ -48,16 +48,6 @@ export function fmtWithSpread(
 }
 
 /**
- * Wraps one prose line on spaces so terminal output never relies on
- * the terminal's own hard wrapping.
- *
- * @param text - The line to wrap; existing newlines are not handled.
- * @param width - Maximum line length, default 100.
- * @param continuationIndent - Prefix for wrapped continuation lines.
- * @returns One or more lines, each within the width (except a single
- *   word longer than the width, which stays intact).
- */
-/**
  * The label every renderer shows for an unreviewed drafted pack.
  *
  * @param provenance - The run's pack provenance, or null.
@@ -76,6 +66,16 @@ export function provenanceLabel(
   );
 }
 
+/**
+ * Wraps one prose line on spaces so terminal output never relies on
+ * the terminal's own hard wrapping.
+ *
+ * @param text - The line to wrap; existing newlines are not handled.
+ * @param width - Maximum line length, default 100.
+ * @param continuationIndent - Prefix for wrapped continuation lines.
+ * @returns One or more lines, each within the width (except a single
+ *   word longer than the width, which stays intact).
+ */
 export function wrapLine(text: string, width = 100, continuationIndent = '    '): string[] {
   const words = text.split(' ');
   const lines: string[] = [];

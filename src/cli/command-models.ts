@@ -16,7 +16,7 @@ import { resolveCandidates } from '../catalog/model-resolver.js';
 import { assessCandidates } from '../orchestrator/run-planner.js';
 import { fmtMib, renderColumns, wrapLine } from '../report/format.js';
 import { selectMemoryProbes } from '../telemetry/probe-select.js';
-import type { MemorySource, ProbeSelectOptions } from '../telemetry/probe-select.js';
+import type { MemoryProbeSet, MemorySource, ProbeSelectOptions } from '../telemetry/probe-select.js';
 
 /** Options parsed from the command line. */
 export interface ModelsCommandOptions {
@@ -34,6 +34,16 @@ export interface ModelsCommandOptions {
 }
 
 const DEFAULT_PREVIEW_CONTEXT = 4096;
+
+function unmeasurableReason(probes: MemoryProbeSet): string {
+  if (probes.unavailableReason !== null) {
+    return probes.unavailableReason;
+  }
+  if (probes.source === 'system-memory') {
+    return '/proc/meminfo is readable but has no MemAvailable line (kernels 3.14+ provide it), so the free-RAM budget cannot be computed';
+  }
+  return `the ${probes.source} free-memory sample returned nothing`;
+}
 
 function budgetNote(source: MemorySource): string {
   if (source === 'unified-memory') {
@@ -103,7 +113,7 @@ export async function modelsCommand(options: ModelsCommandOptions): Promise<stri
   const lines: string[] = [
     `${String(assessments.length)} candidate${assessments.length === 1 ? '' : 's'} | ${backendVersion} | ` +
       (freeVramMib === null
-        ? 'free memory not measurable (no nvidia-smi, not Apple Silicon macOS, /proc/meminfo unreadable), so fit verdicts are "unknown" and a sweep will attempt every candidate'
+        ? `free memory not measurable (${unmeasurableReason(probes)}), so fit verdicts are "unknown" and a sweep will attempt every candidate`
         : `${fmtMib(freeVramMib)} MiB free for models${budgetNote(probes.source)}`),
     `fit predicted at context ${String(context)}; a sweep uses each pack's declared context (preview another with --context)`,
     '',

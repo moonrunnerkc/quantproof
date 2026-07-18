@@ -125,6 +125,22 @@ describe('renderMarkdownReport', () => {
     expect(rendered).toContain('| not measured |');
   });
 
+  it('never claims nvidia-smi polling when memory was not measured at all', () => {
+    const data = caseStudyData();
+    const rendered = renderMarkdownReport({
+      ...data,
+      run: runRecord({
+        gpuName: null, driverVersion: null, vramAvailable: false,
+        vramUnavailableReason: 'no memory telemetry on this machine, so memory was not measured',
+      }),
+      aggregates: [makeAggregate('cpu-model', { vram: null })],
+      pareto: paretoFrontier([makeAggregate('cpu-model', { vram: null })]),
+      recommendation: recommend([makeAggregate('cpu-model', { vram: null })]),
+    });
+    expect(rendered).not.toContain('GPU memory via nvidia-smi');
+    expect(rendered).toContain('Memory was not measured');
+  });
+
   it('labels a system-RAM run as CPU inference in the methodology', () => {
     const data = caseStudyData();
     const rendered = renderMarkdownReport({

@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
@@ -61,5 +61,21 @@ describe('writePackDraft', () => {
     expect(() => writePackDraft(join(root, 'twice'), draft, provenance)).toThrow(
       /already exists.*pick another directory/,
     );
+  });
+
+  it('refuses a non-empty directory so stale examples never merge into a new draft', () => {
+    const stale = join(root, 'stale');
+    mkdirSync(join(stale, 'examples'), { recursive: true });
+    writeFileSync(join(stale, 'examples', '099.json'), '{"input":"old","expected":"old"}\n');
+    expect(() => writePackDraft(stale, draft, provenance)).toThrow(
+      /already exists.*pick another directory/,
+    );
+  });
+
+  it('accepts an existing but empty directory', () => {
+    const empty = join(root, 'empty');
+    mkdirSync(empty, { recursive: true });
+    const written = writePackDraft(empty, draft, provenance);
+    expect(loadTaskPack(written.dir, listScorers()).examples).toHaveLength(12);
   });
 });

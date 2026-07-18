@@ -6,7 +6,7 @@
  * writing.
  */
 
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { stringify } from 'yaml';
 import type { PackProvenance } from '../tasks/task-schema.js';
@@ -35,14 +35,31 @@ export interface WrittenPack {
 }
 
 /**
+ * Checks that a directory is safe to receive a fresh pack draft.
+ *
+ * @param targetDir - Pack directory a draft would be written into.
+ * @throws When the directory exists and holds any file: writing there
+ *   would merge stale files (leftover examples included) into the new
+ *   draft, so pick another directory or delete this one first.
+ */
+export function assertPackTargetWritable(targetDir: string): void {
+  const dir = resolve(targetDir);
+  if (existsSync(dir) && readdirSync(dir).length > 0) {
+    throw new Error(
+      `${dir} already exists and is not empty; ingest never overwrites or merges into an existing directory, so pick another directory or delete it first (rm -r ${dir})`,
+    );
+  }
+}
+
+/**
  * Writes a pack draft and its provenance as a task pack directory.
  *
  * @param targetDir - Pack directory to create; resolved to absolute.
  * @param draft - The checked draft from parseDraft.
  * @param provenance - Drafting provenance recorded in task.yaml.
  * @returns The absolute directory and the files written.
- * @throws When the directory already holds a task.yaml; pick another
- *   directory or delete the existing pack first.
+ * @throws When the directory exists non-empty (stale files, a prior
+ *   pack); pick another directory or delete it first.
  */
 export function writePackDraft(
   targetDir: string,
@@ -50,11 +67,7 @@ export function writePackDraft(
   provenance: PackProvenance,
 ): WrittenPack {
   const dir = resolve(targetDir);
-  if (existsSync(join(dir, 'task.yaml'))) {
-    throw new Error(
-      `${join(dir, 'task.yaml')} already exists; ingest never overwrites a pack, so pick another directory or delete it first`,
-    );
-  }
+  assertPackTargetWritable(dir);
   mkdirSync(join(dir, 'examples'), { recursive: true });
 
   const manifest = {

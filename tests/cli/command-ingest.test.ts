@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, describe, expect, it, vi } from 'vitest';
@@ -153,5 +153,89 @@ describe('ingestCommand', () => {
     });
     expect(adapter.loads[0]?.model).toBe('gemma3:1b');
     expect(loadTaskPack(dir, listScorers()).manifest.provenance?.drafted_by).toContain('gemma3:1b');
+  });
+
+  it('falls back to the largest local model when free memory is unknown', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    const adapter = adapterWith(() => ({ kind: 'ok', output: validDraft() }));
+    adapter.localModels = [
+      {
+        name: 'gemma3:1b', digest: 'a'.repeat(64), sizeBytes: 815_319_791,
+        quantization: 'Q4_K_M', parameterSize: '999.89M', remote: false,
+      },
+      {
+        name: 'gemma3:27b', digest: 'b'.repeat(64), sizeBytes: 17_000_000_000,
+        quantization: 'Q4_0', parameterSize: '27B', remote: false,
+      },
+    ];
+    const dir = join(root, 'unknown-fit');
+    await ingestCommand({
+      source: sourcePath,
+      dir,
+      adapter,
+      probeOptions: {
+        nvidiaBinary: join(root, 'no-such-nvidia-smi'),
+        nvidiaDevicePaths: [],
+        unified: { platform: 'linux' },
+        system: { meminfoPath: join(root, 'no-such-meminfo') },
+      },
+    });
+    expect(adapter.loads[0]?.model).toBe('gemma3:27b');
+  });
+
+  it('refuses an existing non-empty target before spending a drafting generation', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    const adapter = adapterWith(() => ({ kind: 'ok', output: validDraft() }));
+    const dir = join(root, 'occupied');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, 'task.yaml'), 'name: existing\n');
+    await expect(
+      ingestCommand({ source: sourcePath, dir, model: 'gemma3:4b', adapter }),
+    ).rejects.toThrow(/already exists.*pick another directory/s);
+    expect(adapter.generatePrompts).toHaveLength(0);
+  });
+
+  it('saves the draft response when the derived directory collides after drafting', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    const adapter = adapterWith(() => ({ kind: 'ok', output: validDraft() }));
+    const cwd = process.cwd();
+    const sandbox = join(root, 'derived-collision');
+    mkdirSync(join(sandbox, 'lwt-common-tasks'), { recursive: true });
+    writeFileSync(join(sandbox, 'lwt-common-tasks', 'task.yaml'), 'name: existing\n');
+    process.chdir(sandbox);
+    try {
+      await expect(
+        ingestCommand({ source: sourcePath, model: 'gemma3:4b', adapter }),
+      ).rejects.toThrow(/already exists.*draft-response\.txt/s);
+      expect(readFileSync(join(sandbox, 'lwt-common-tasks-draft-response.txt'), 'utf8')).toContain(
+        '"scorer":"exact-label"',
+      );
+    } finally {
+      process.chdir(cwd);
+    }
+  });
+
+  it('writes the unsalvageable response even when the target parent does not exist', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    const adapter = adapterWith(() => ({ kind: 'ok', output: 'I cannot help with that.' }));
+    const dir = join(root, 'nested', 'deeper', 'pack');
+    await expect(
+      ingestCommand({ source: sourcePath, dir, model: 'gemma3:4b', adapter }),
+    ).rejects.toThrow(/never produced JSON/);
+    expect(readFileSync(`${dir}-draft-response.txt`, 'utf8')).toContain('I cannot help');
+  });
+
+  it('never prints "labels: undefined" for a salvaged draft without labels', async () => {
+    const logs: string[] = [];
+    vi.spyOn(console, 'log').mockImplementation((line: string) => {
+      logs.push(line);
+    });
+    const unknownScorer = validDraft()
+      .replace('"exact-label"', '"vibes"')
+      .replace('"scorer_params":{"labels":["sale","challenge","listing"]},', '');
+    const adapter = adapterWith(() => ({ kind: 'ok', output: unknownScorer }));
+    const dir = join(root, 'no-labels');
+    await ingestCommand({ source: sourcePath, dir, model: 'gemma3:4b', adapter });
+    expect(logs.join('\n')).not.toContain('labels: undefined');
   });
 });

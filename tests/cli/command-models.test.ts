@@ -107,4 +107,25 @@ describe('modelsCommand on a CPU-only box', () => {
     expect(text).toMatch(/gemma3:1b.*fits/);
     expect(text).toMatch(/mystery:7b\s+.*unknown/);
   });
+
+  it('names the missing MemAvailable field instead of claiming meminfo is unreadable', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    const { mkdtempSync, writeFileSync } = await import('node:fs');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    const dir = mkdtempSync(join(tmpdir(), 'qp-models-oldk-'));
+    const meminfo = join(dir, 'meminfo');
+    writeFileSync(meminfo, 'MemTotal:       16000000 kB\n');
+    const text = await modelsCommand({
+      adapter: fakeAdapter(),
+      probeOptions: {
+        nvidiaBinary: join(dir, 'no-such-nvidia-smi'),
+        nvidiaDevicePaths: [],
+        unified: { platform: 'linux' },
+        system: { meminfoPath: meminfo, osRelease: '3.10.0-old' },
+      },
+    });
+    expect(text).toContain('MemAvailable');
+    expect(text).not.toContain('/proc/meminfo unreadable');
+  });
 });

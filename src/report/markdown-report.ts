@@ -36,14 +36,16 @@ export function reproductionCommand(run: RunRecord): string {
   return parts.join(' ');
 }
 
-function memoryMethod(gpuName: string | null): string {
-  if (gpuName?.includes('unified memory') === true) {
-    return 'resident backend process memory on Apple Silicon';
+function memorySentence(run: RunRecord): string {
+  if (run.gpuName === null) {
+    return `Memory was not measured (${run.vramUnavailableReason ?? 'no memory telemetry on this machine'}).`;
   }
-  if (gpuName === 'system RAM') {
-    return 'resident backend process memory against system RAM, CPU inference';
-  }
-  return 'GPU memory via nvidia-smi';
+  const method = run.gpuName.includes('unified memory')
+    ? 'resident backend process memory on Apple Silicon'
+    : run.gpuName === 'system RAM'
+      ? 'resident backend process memory against system RAM, CPU inference'
+      : 'GPU memory via nvidia-smi';
+  return `Memory is polled during load and generation (${method}); the peak is the highest sample.`;
 }
 
 interface Footnote {
@@ -215,7 +217,7 @@ export function renderMarkdownReport(data: ReportData): string {
     '',
     api
       ? `Each example ran ${String(run.generation.runs_per_example)} time${run.generation.runs_per_example === 1 ? '' : 's'} at temperature ${String(run.generation.temperature)} over the streaming Messages API, after one untimed warmup request per model. The API has no sampler seed, so repetitions are compared byte for byte and flagged when they differ. Time to first token includes the network path to the API; token counts come from the API's own usage fields. What is and is not measured on this backend is documented in [docs/methodology.md](docs/methodology.md).`
-      : `Each example ran ${String(run.generation.runs_per_example)} time${run.generation.runs_per_example === 1 ? '' : 's'} at temperature ${String(run.generation.temperature)} with a fixed seed, after one untimed warmup per model; models ran strictly one at a time with forced unload and a cooldown between candidates. Quality spread is the range of per-repetition means. Memory is polled during load and generation (${memoryMethod(run.gpuName)}); the peak is the highest sample. Measurement limits (polling resolution, warmup policy, determinism caveats, partial-offload detection) are documented in [docs/methodology.md](docs/methodology.md).`,
+      : `Each example ran ${String(run.generation.runs_per_example)} time${run.generation.runs_per_example === 1 ? '' : 's'} at temperature ${String(run.generation.temperature)} with a fixed seed, after one untimed warmup per model; models ran strictly one at a time with forced unload and a cooldown between candidates. Quality spread is the range of per-repetition means. ${memorySentence(run)} Measurement limits (polling resolution, warmup policy, determinism caveats, partial-offload detection) are documented in [docs/methodology.md](docs/methodology.md).`,
     '',
     '## Reproduce',
     '',

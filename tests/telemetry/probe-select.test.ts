@@ -54,6 +54,7 @@ describe('selectMemoryProbes', () => {
   it('falls back to system memory when there is no GPU telemetry at all', () => {
     const set = selectMemoryProbes('ollama', {
       nvidiaBinary: missingNvidia,
+      nvidiaDevicePaths: [],
       unified: { ...unified, platform: 'linux' },
       system,
     });
@@ -64,6 +65,23 @@ describe('selectMemoryProbes', () => {
       freeMib: Math.round(10240000 / 1024),
       usedMib: Math.round(16000000 / 1024) - Math.round(10240000 / 1024),
     });
+  });
+
+  it('refuses the RSS fallback when an NVIDIA device exists without nvidia-smi', async () => {
+    const devicePath = join(dir, 'fake-nvidia0');
+    writeFileSync(devicePath, '');
+    const set = selectMemoryProbes('ollama', {
+      nvidiaBinary: missingNvidia,
+      nvidiaDevicePaths: [devicePath],
+      unified: { ...unified, platform: 'linux' },
+      system,
+    });
+    expect(set.source).toBe('none');
+    expect(set.gpu).toBeNull();
+    expect(set.unavailableReason).toMatch(/NVIDIA GPU.*nvidia-smi/);
+    expect(set.sampleOnce()).toBeNull();
+    const result = await set.startProbe().stop();
+    expect(result.available).toBe(false);
   });
 
   it('reports no telemetry with the reason when no source works', async () => {

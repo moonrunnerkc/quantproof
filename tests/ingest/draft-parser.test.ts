@@ -111,4 +111,16 @@ describe('parseDraft', () => {
     );
     expect(errors.some((e) => e.includes('must be a number'))).toBe(true);
   });
+
+  it('requires a non-empty patterns array for the pattern scorer', () => {
+    const errors = errorsFor(labelDraft({ scorer: 'pattern', scorer_params: {} }));
+    expect(errors.some((e) => e.includes('scorer_params.patterns'))).toBe(true);
+  });
+
+  it('requires an inline schema object for the json-schema scorer', () => {
+    const errors = errorsFor(
+      labelDraft({ scorer: 'json-schema', scorer_params: { schema: './schema.json' } }),
+    );
+    expect(errors.some((e) => e.includes('scorer_params.schema'))).toBe(true);
+  });
 });

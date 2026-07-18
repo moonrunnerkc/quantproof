@@ -4,9 +4,11 @@
  * machines use nvidia-smi, Apple Silicon uses the unified-memory
  * probe, API backends measure nothing by design, and every other
  * machine falls back to the system-memory probe so local runs always
- * carry a measured peak.
+ * carry a measured peak. The one exception: an NVIDIA device without
+ * nvidia-smi measures nothing, because RSS would misstate VRAM use.
  */
 
+import { existsSync } from 'node:fs';
 import { API_BACKEND_VRAM_REASON, apiNoopProbe } from '../backends/backend-select.js';
 import { DEFAULT_RAPID_MLX_URL } from '../backends/rapid-mlx-adapter.js';
 import type { BackendKind } from '../catalog/run-config.js';
@@ -30,6 +32,13 @@ export type MemorySource =
 export const NO_TELEMETRY_REASON =
   'no memory telemetry on this machine (nvidia-smi not found, not Apple Silicon macOS, and /proc/meminfo unreadable), so memory was not measured';
 
+/** Rendered when a GPU is present but its telemetry tool is missing. */
+export const NVIDIA_WITHOUT_SMI_REASON =
+  'an NVIDIA GPU is present but nvidia-smi is not on PATH; process memory would exclude VRAM-resident weights and misstate the peak, so memory was not measured. Install the NVIDIA driver utilities (nvidia-smi) and rerun';
+
+/** Device nodes whose presence means an NVIDIA GPU exists on this box. */
+const NVIDIA_DEVICE_PATHS = ['/dev/nvidia0', '/dev/nvidiactl', '/proc/driver/nvidia'] as const;
+
 /** The chosen telemetry: identity plus the probe constructors a sweep needs. */
 export interface MemoryProbeSet {
   readonly source: MemorySource;
@@ -49,6 +58,8 @@ const PROCESS_HINTS: Readonly<Partial<Record<BackendKind, readonly string[]>>> =
 /** Test injectables. */
 export interface ProbeSelectOptions {
   readonly nvidiaBinary?: string;
+  /** Paths whose existence signals an NVIDIA GPU; overridable for tests. */
+  readonly nvidiaDevicePaths?: readonly string[];
   readonly unified?: UnifiedProbeOptions;
   readonly system?: SystemProbeOptions;
   /** Rapid-MLX server URL; the sweep's --base-url when given. */
@@ -108,6 +119,23 @@ export function selectMemoryProbes(kind: BackendKind, options: ProbeSelectOption
       unavailableReason: null,
       startProbe: () => startUnifiedMemoryProbe(hints, options.unified),
       sampleOnce: () => queryUnifiedMemoryOnce(hints, options.unified),
+    };
+  }
+  // A GPU without its telemetry tool must not degrade to the RSS
+  // fallback: VRAM-resident weights never show in process RSS, so the
+  // numbers would look measured while being wrong. Refuse instead.
+  const devicePaths = options.nvidiaDevicePaths ?? NVIDIA_DEVICE_PATHS;
+  if (devicePaths.some((path) => existsSync(path))) {
+    return {
+      source: 'none',
+      gpu: null,
+      unavailableReason: NVIDIA_WITHOUT_SMI_REASON,
+      startProbe: () => ({
+        gpu: null,
+        unavailableReason: NVIDIA_WITHOUT_SMI_REASON,
+        stop: () => Promise.resolve({ available: false, reason: NVIDIA_WITHOUT_SMI_REASON }),
+      }),
+      sampleOnce: () => null,
     };
   }
   const system = querySystemIdentity(options.system);

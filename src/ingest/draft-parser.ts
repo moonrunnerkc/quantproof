@@ -113,6 +113,19 @@ function checkScorerFit(
       );
     }
   }
+  if (scorer === 'pattern') {
+    const patterns = params['patterns'];
+    if (!Array.isArray(patterns) || patterns.length === 0 || !patterns.every((p) => typeof p === 'string')) {
+      errors.push('scorer_params.patterns must be a non-empty array of strings for pattern');
+    }
+  }
+  if (scorer === 'json-schema') {
+    if (!isRecord(params['schema'])) {
+      errors.push(
+        'scorer_params.schema must be an inline JSON Schema object for json-schema (drafted packs carry the schema inline, not as a file path)',
+      );
+    }
+  }
   if (scorer === 'numeric-tolerance') {
     const tolerance = params['tolerance'];
     if (typeof tolerance !== 'number' || !Number.isFinite(tolerance) || tolerance < 0) {

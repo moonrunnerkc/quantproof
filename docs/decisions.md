@@ -136,6 +136,16 @@ of each section.
 - A draft that fails all rounds is salvaged (placeholders for broken fields, structurally invalid examples dropped) and written anyway with the errors printed, per spec 5.9; only a response with no JSON at all refuses, keeping the raw text at <dir>-draft-response.txt. Salvage never invents examples.
 - Provenance rides in task.yaml (source, sha256, drafted_by, drafted_at, reviewed), is persisted on the run row (nullable provenance_json, added in place to older databases via a guarded ALTER since CREATE IF NOT EXISTS never alters), and renders in all three report surfaces until reviewed: true. Scoring never touches the drafting model.
 - task.yaml keeps its tolerate-unknown-keys stance, which is what let provenance land without breaking older validators; the run config's reject-unknown-keys stance is unchanged.
+- Post-review hardening (2026-07-18), ten findings from a high-effort review of the ingest/telemetry commits, all fixed test-first:
+  - Probe selection refuses the RSS fallback when an NVIDIA device node exists (/dev/nvidia0, /dev/nvidiactl, /proc/driver/nvidia) without nvidia-smi on PATH: RSS excludes VRAM-resident weights, so a "measured" number there would be confidently wrong; refusing with an install hint preserves the never-estimated promise.
+  - writePackDraft refuses any existing non-empty directory, not just one holding task.yaml, so a re-draft can never merge stale example files from a previous draft into a new pack; an existing empty directory stays fine.
+  - The markdown methodology derives its memory sentence from the run record and says "Memory was not measured" with the reason when there is no telemetry, instead of falling through to the nvidia-smi claim.
+  - parseDraft now validates scorer_params for pattern (non-empty patterns array) and json-schema (inline schema object) so broken drafts hit the repair rounds instead of failing later at run time; drafted packs carry schemas inline because ingest writes no schema files.
+  - pickDrafter falls back to the largest local model when free memory cannot be sampled (every verdict unknown), honoring the documented default; smallest-first remains only for the measured-but-nothing-fits case.
+  - ingest checks a --dir target for emptiness before spending any drafting inference, and a collision on the derived directory (only discoverable after drafting) saves the response to <dir>-draft-response.txt instead of discarding the finished generation; that save path now creates missing parent directories so the real error is never masked by ENOENT.
+  - The models command names the actual cause when free memory is unmeasurable (probe reason, or a readable /proc/meminfo lacking MemAvailable) instead of asserting the file is unreadable.
+  - The ingest summary only prints the labels/key-fields shorthand when the param exists, so salvaged drafts no longer print "labels: undefined".
+  - provenanceLabel moved below wrapLine in format.ts so wrapLine's JSDoc reattaches to its declaration.
 
 ## Deferred
 
