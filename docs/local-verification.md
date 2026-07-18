@@ -29,21 +29,24 @@ zero mismatches. Memory columns read "not measured" on the Mac today;
 that is the designed degradation until unified-memory measurement
 lands.
 
-## Open gates (Mac, in build order)
+## Closed gates (2026-07-17, live on the M5 Max)
 
-1. **Unified-memory measurement.** A Mac-native memory probe behind
-   the existing probe interface, so "peak memory" is measured on Apple
-   Silicon instead of marked unmeasured, and the fit predictor compares
-   against free unified memory. Gate: a sweep's reported peak is in the
-   same ballpark as external observation (Activity Monitor or
-   `footprint`/`vm_stat` sampling) while a model generates.
-2. **Rapid-MLX backend adapter.** OpenAI-compatible local server on
-   MLX (http://localhost:8000/v1). Gate: the same pack sweeps both
-   backends and the report labels each candidate's backend honestly;
-   verify streaming TTFT, token counts, and determinism behavior
-   against the live instance, not documentation memory.
-3. **Backend comparison study.** Same models, same pack, Ollama versus
-   Rapid-MLX on the M5 Max: the Mac case study for the README.
+1. **Unified-memory measurement: closed.** The probe samples backend
+   process RSS on Apple Silicon; a live sweep reported gemma3:1b at a
+   1511 MiB peak against a 1854 MiB prediction, and the approach was
+   validated against Ollama's own accounting (runner RSS 14.4 GiB vs
+   /api/ps 14.1 GiB for an 11 GB model). Fit verdicts are real on the
+   Mac now (75% unified-memory budget).
+2. **Rapid-MLX backend adapter: closed.** Verified against the live
+   0.6.0 instance: streaming, usage counts, cache clearing, and memory
+   from the server's Metal accounting (26.8 GiB peak for the served
+   30B, where process RSS misleadingly reads 1.3 GiB). Reports label
+   the backend in every row and environment line.
+
+## Open gate
+
+**Backend comparison study.** Same task packs, Ollama versus Rapid-MLX
+on the M5 Max: the Mac case study for the README.
 
 ## Not needed anywhere
 

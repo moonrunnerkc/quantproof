@@ -6,15 +6,36 @@ already in the local Ollama store.
 
 ```yaml
 # quantproof.yaml
-backend: ollama      # or "anthropic"; default ollama
+backend: ollama      # "rapid-mlx" or "anthropic"; default ollama
 candidates:          # evaluated first, pulled on demand if missing
   - gemma3:1b
   - qwen3:4b
-use_local_models: true   # ollama only: also sweep everything already pulled (default true)
+use_local_models: true   # local backends: also sweep everything already available (default true)
 ```
 
 That is the whole format. Unknown keys are an error so a typo cannot
 silently change what runs.
+
+## The rapid-mlx backend
+
+`backend: rapid-mlx` runs the sweep against a local
+[Rapid-MLX](https://github.com/raullenchai/Rapid-MLX) server
+(OpenAI-compatible, MLX, Apple Silicon only) at
+http://localhost:8000. The server holds exactly one resident model per
+process, chosen when it starts:
+
+```
+rapid-mlx serve <model> --served-model-name my-model:tag
+quantproof run --pack <dir> --config rapid.yaml   # backend: rapid-mlx
+```
+
+With no candidates list the sweep covers whatever the server is
+serving. Models cannot be pulled or unloaded at runtime, so comparing
+several MLX models means one server (and one quantproof run) per
+model; the stored runs compare across reports. Fit is not predicted
+(the server exposes no weight files); peak memory is measured from the
+server's own Metal accounting, and the prompt cache is cleared before
+every generation so latency measures fresh inference.
 
 ## The anthropic backend
 

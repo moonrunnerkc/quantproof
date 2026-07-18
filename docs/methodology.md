@@ -7,19 +7,28 @@ because they decide how much to trust any number in a report.
 
 Read these before citing a quantproof report.
 
-- **VRAM polling can miss transients.** The probe runs `nvidia-smi
-  --query-gpu=memory.used -lms 200`, so the recorded peak is the
-  highest 200 ms sample. Allocation spikes shorter than the polling
-  interval (transient compute buffers, fragmentation churn) can exceed
-  the reported peak. Treat "peak VRAM" as a floor on the true peak,
-  accurate to the polling interval, not an allocator trace.
-- **Memory measurement is nvidia-smi only, today.** On machines
-  without it (Apple Silicon, AMD, no GPU), runs still execute but every
-  memory figure is reported as "not measured", never estimated. Apple
-  Silicon's unified memory makes "fits" a different question and its
-  measurement is the current work, not a someday item; until it lands,
-  Mac reports carry measured quality and latency with memory marked
-  honestly as unmeasured.
+- **Memory polling can miss transients.** Every memory source samples
+  at roughly 200 ms, so the recorded peak is the highest sample.
+  Allocation spikes shorter than the polling interval (transient
+  compute buffers, fragmentation churn) can exceed the reported peak.
+  Treat "peak memory" as a floor on the true peak, accurate to the
+  polling interval, not an allocator trace.
+- **Memory is measured per platform, from the most honest source
+  available.** NVIDIA GPUs: `nvidia-smi --query-gpu=memory.used`.
+  Apple Silicon with Ollama: the summed resident memory (RSS) of the
+  backend's processes, which tracks Ollama's own resident-model
+  accounting within a few percent (verified live) but is still an
+  approximation of the Metal working set, not an allocator trace.
+  Rapid-MLX: the server's own Metal accounting at `/v1/status`,
+  because MLX Metal buffers do not appear in process RSS at all.
+  Everything else (AMD, CPU-only Linux, Windows without NVIDIA): runs
+  execute with memory reported as "not measured", never estimated.
+- **The Apple Silicon fit budget is a heuristic.** Fit predictions on
+  unified memory compare against 75% of physical RAM (Metal's
+  working-set convention) minus the backend's resident memory. Other
+  applications' memory pressure is not counted, and macOS can page
+  aggressively, so treat Mac fit verdicts as a planning aid; the
+  measured peak in the report is the real number.
 - **Ollama decides GPU offload, not quantproof.** A model that does not
   fully fit may silently run split across CPU and GPU. The report flags
   *suspected* partial offload with a stated reason when either signal
@@ -46,7 +55,15 @@ Read these before citing a quantproof report.
   backend- and hardware-specific: byte-identical repeats were verified
   live on Ollama 0.23.1 on CPU and on Apple Metal, but a backend or
   driver update can change this, which is exactly why the check runs
-  every time instead of being trusted once.
+  every time instead of being trusted once. Rapid-MLX 0.6.0 with
+  continuous batching produced differing outputs for identical seeded
+  temperature-0 requests in live probing; that is a property of the
+  backend the nondet flag exists to surface, not noise to suppress.
+- **Rapid-MLX latency is measured cold.** The server keeps a prompt
+  cache that can replay repeated identical requests at near-zero TTFT;
+  quantproof clears it before every generation so repetitions measure
+  fresh inference. A production deployment with the cache warm will
+  see better TTFT than the report shows for repeated prompts.
 - **OOM classification is pattern-based and deliberately a suspicion.**
   Ollama reports load failures generically, so "model failed to load
   ... resource limitations" on a memory-starved machine is classified

@@ -62,13 +62,14 @@ unedited.
 Requirements:
 
 - Node.js 22+
-- For local model sweeps: [Ollama](https://ollama.com) running
-- Any machine works: macOS on Apple Silicon, Linux, or Windows
+- A local backend: [Ollama](https://ollama.com) (macOS, Linux,
+  Windows) or [Rapid-MLX](https://github.com/raullenchai/Rapid-MLX)
+  (Apple Silicon)
 
-Memory measurement depends on the hardware: on NVIDIA GPUs the peak is
-polled via nvidia-smi; everywhere else the memory columns are clearly
-marked "not measured" (unified-memory measurement for Apple Silicon is
-in progress). Quality and latency are measured on every machine.
+Quality and latency are measured on every machine. Peak memory is
+measured on Apple Silicon (unified memory) and on NVIDIA GPUs
+(nvidia-smi); anywhere else the memory columns are clearly marked
+"not measured", never estimated.
 
 ```sh
 git clone https://github.com/moonrunnerkc/quantproof && cd quantproof
