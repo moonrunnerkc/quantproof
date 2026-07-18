@@ -8,10 +8,8 @@
  * Apple Silicon macOS the probe reports that state explicitly.
  */
 
-import { execFile, spawnSync } from 'node:child_process';
-import { performance } from 'node:perf_hooks';
-import type { GpuInfo, VramProbe, VramProbeResult, VramSample, VramSnapshot } from './vram-probe.js';
-import { VRAM_TIMELINE_CAP } from './vram-probe.js';
+import { parsePsRss, readCommand, startRssProbe } from './ps-rss-sampler.js';
+import type { GpuInfo, VramProbe, VramSnapshot } from './vram-probe.js';
 
 /**
  * Fraction of physical memory treated as the model budget. Metal caps
@@ -33,14 +31,6 @@ export interface UnifiedProbeOptions {
   readonly platform?: NodeJS.Platform;
   readonly intervalMs?: number;
   readonly timelineCap?: number;
-}
-
-function readCommand(binary: string, args: readonly string[]): string | null {
-  const result = spawnSync(binary, [...args], { encoding: 'utf8', timeout: 5000 });
-  if (result.error !== undefined || result.status !== 0) {
-    return null;
-  }
-  return result.stdout.trim();
 }
 
 /**
@@ -69,24 +59,6 @@ export function queryUnifiedIdentity(options: UnifiedProbeOptions = {}): GpuInfo
   };
 }
 
-function parsePsOutput(stdout: string, hints: readonly string[]): number {
-  const lower = hints.map((h) => h.toLowerCase());
-  let rssKib = 0;
-  for (const line of stdout.split('\n')) {
-    const trimmed = line.trim();
-    const space = trimmed.indexOf(' ');
-    if (space < 1) {
-      continue;
-    }
-    const rss = Number.parseInt(trimmed.slice(0, space), 10);
-    const command = trimmed.slice(space + 1).toLowerCase();
-    if (!Number.isNaN(rss) && lower.some((hint) => command.includes(hint))) {
-      rssKib += rss;
-    }
-  }
-  return Math.round(rssKib / 1024);
-}
-
 /**
  * Samples the backend's resident memory once and derives the free
  * model budget.
@@ -110,18 +82,13 @@ export function queryUnifiedMemoryOnce(
   if (stdout === null) {
     return null;
   }
-  const usedMib = parsePsOutput(stdout, hints);
+  const usedMib = parsePsRss(stdout, hints);
   const budgetMib = Math.floor(identity.totalMib * UNIFIED_BUDGET_FRACTION);
   return { usedMib, freeMib: Math.max(0, budgetMib - usedMib) };
 }
 
 /**
  * Starts sampling the backend's resident memory on an interval.
- *
- * Start before model load and stop after unload so the peak covers the
- * whole lifecycle. Sampling spawns ps asynchronously so the event loop
- * (and with it TTFT timing) is never blocked; overlapping ticks are
- * skipped rather than queued.
  *
  * @param hints - Process substrings identifying the backend.
  * @param options - Binary, platform, interval, and cap overrides.
@@ -140,64 +107,5 @@ export function startUnifiedMemoryProbe(
       stop: () => Promise.resolve({ available: false, reason: UNIFIED_UNAVAILABLE_REASON }),
     };
   }
-  const ps = options.ps ?? 'ps';
-  const timelineCap = Math.max(2, options.timelineCap ?? VRAM_TIMELINE_CAP);
-  let samples: VramSample[] = [];
-  let peakMib = 0;
-  let inFlight = false;
-  let sampleFailure: string | null = null;
-
-  const tick = (): void => {
-    if (inFlight) {
-      return;
-    }
-    inFlight = true;
-    execFile(ps, ['-axo', 'rss=,command='], { timeout: 5000 }, (error, stdout) => {
-      inFlight = false;
-      if (error !== null) {
-        sampleFailure = `failed to run ${ps}: ${error.message}`;
-        return;
-      }
-      const usedMib = parsePsOutput(stdout, hints);
-      peakMib = Math.max(peakMib, usedMib);
-      samples.push({ at: performance.now(), usedMib });
-      if (samples.length >= timelineCap) {
-        samples = samples.filter((_, index) => index % 2 === 0);
-      }
-    });
-  };
-  const timer = setInterval(tick, options.intervalMs ?? 200);
-  timer.unref();
-  tick();
-
-  return {
-    gpu: identity,
-    unavailableReason: null,
-    stop: () =>
-      new Promise<VramProbeResult>((resolvePromise) => {
-        clearInterval(timer);
-        const finish = (): void => {
-          if (samples.length === 0) {
-            resolvePromise({
-              available: false,
-              reason: sampleFailure ?? `${ps} produced no samples before the run finished`,
-            });
-          } else {
-            resolvePromise({ available: true, gpu: identity, peakMib, samples: [...samples] });
-          }
-        };
-        // Wait for an in-flight ps to land (bounded) so a short probe
-        // window still returns its sample instead of racing to empty.
-        let waitedMs = 0;
-        const awaitInFlight = (): void => {
-          if (!inFlight || waitedMs >= 2000) {
-            finish();
-            return;
-          }
-          waitedMs += 10;
-          setTimeout(awaitInFlight, 10);
-        };
-        awaitInFlight();
-      }),
-  };
+  return startRssProbe(identity, hints, options);
 }
