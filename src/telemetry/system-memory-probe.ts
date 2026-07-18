@@ -27,11 +27,11 @@ export interface SystemProbeOptions {
 }
 
 function meminfoValueMib(content: string, key: string): number | null {
-  const match = new RegExp(`^${key}:\\s+(\\d+) kB`, 'm').exec(content);
-  if (match === null) {
+  const kib = new RegExp(`^${key}:\\s+(\\d+) kB`, 'm').exec(content)?.[1];
+  if (kib === undefined) {
     return null;
   }
-  return Math.round(Number.parseInt(match[1], 10) / 1024);
+  return Math.round(Number.parseInt(kib, 10) / 1024);
 }
 
 function readMeminfo(options: SystemProbeOptions): string | null {

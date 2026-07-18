@@ -1,14 +1,20 @@
 /**
  * Memory telemetry selection: one place decides how a run measures
- * model memory. NVIDIA machines use nvidia-smi, Apple Silicon uses the
- * unified-memory probe, API backends measure nothing by design, and
- * everything else runs unmeasured with the reason stated loudly.
+ * model memory, by checking the hardware, never by assuming. NVIDIA
+ * machines use nvidia-smi, Apple Silicon uses the unified-memory
+ * probe, API backends measure nothing by design, and every other
+ * machine falls back to the system-memory probe so local runs always
+ * carry a measured peak.
  */
 
 import { API_BACKEND_VRAM_REASON, apiNoopProbe } from '../backends/backend-select.js';
 import { DEFAULT_RAPID_MLX_URL } from '../backends/rapid-mlx-adapter.js';
 import type { BackendKind } from '../catalog/run-config.js';
 import { startRapidMlxProbe } from './rapid-mlx-probe.js';
+import {
+  querySystemIdentity, querySystemMemoryOnce, startSystemMemoryProbe,
+} from './system-memory-probe.js';
+import type { SystemProbeOptions } from './system-memory-probe.js';
 import {
   queryUnifiedIdentity, queryUnifiedMemoryOnce, startUnifiedMemoryProbe,
 } from './unified-memory-probe.js';
@@ -17,11 +23,12 @@ import { queryGpuIdentity, queryVramOnce, startVramProbe } from './vram-probe.js
 import type { GpuInfo, VramProbe, VramSnapshot } from './vram-probe.js';
 
 /** Where a run's memory numbers come from. */
-export type MemorySource = 'nvidia-smi' | 'unified-memory' | 'rapid-mlx-status' | 'api' | 'none';
+export type MemorySource =
+  | 'nvidia-smi' | 'unified-memory' | 'system-memory' | 'rapid-mlx-status' | 'api' | 'none';
 
 /** Rendered when no telemetry source works on this machine. */
 export const NO_TELEMETRY_REASON =
-  'no memory telemetry on this machine (nvidia-smi not found and not Apple Silicon macOS), so memory was not measured';
+  'no memory telemetry on this machine (nvidia-smi not found, not Apple Silicon macOS, and /proc/meminfo unreadable), so memory was not measured';
 
 /** The chosen telemetry: identity plus the probe constructors a sweep needs. */
 export interface MemoryProbeSet {
@@ -43,6 +50,7 @@ const PROCESS_HINTS: Readonly<Partial<Record<BackendKind, readonly string[]>>> =
 export interface ProbeSelectOptions {
   readonly nvidiaBinary?: string;
   readonly unified?: UnifiedProbeOptions;
+  readonly system?: SystemProbeOptions;
   /** Rapid-MLX server URL; the sweep's --base-url when given. */
   readonly rapidMlxUrl?: string;
 }
@@ -91,15 +99,25 @@ export function selectMemoryProbes(kind: BackendKind, options: ProbeSelectOption
       sampleOnce: () => queryVramOnce(options.nvidiaBinary ?? 'nvidia-smi'),
     };
   }
+  const hints = PROCESS_HINTS[kind] ?? [kind];
   const unified = queryUnifiedIdentity(options.unified);
   if (unified !== null) {
-    const hints = PROCESS_HINTS[kind] ?? [kind];
     return {
       source: 'unified-memory',
       gpu: unified,
       unavailableReason: null,
       startProbe: () => startUnifiedMemoryProbe(hints, options.unified),
       sampleOnce: () => queryUnifiedMemoryOnce(hints, options.unified),
+    };
+  }
+  const system = querySystemIdentity(options.system);
+  if (system !== null) {
+    return {
+      source: 'system-memory',
+      gpu: system,
+      unavailableReason: null,
+      startProbe: () => startSystemMemoryProbe(hints, options.system),
+      sampleOnce: () => querySystemMemoryOnce(options.system),
     };
   }
   return {

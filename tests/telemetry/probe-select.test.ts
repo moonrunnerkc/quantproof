@@ -29,6 +29,10 @@ const unified = {
   ps: fake('sel-ps', 'echo "1048576 ollama runner"'),
   platform: 'darwin' as const,
 };
+const meminfo = join(dir, 'sel-meminfo');
+writeFileSync(meminfo, 'MemTotal:       16000000 kB\nMemAvailable:   10240000 kB\n');
+const system = { meminfoPath: meminfo, osRelease: '6.17.0-test' };
+const missingSystem = { meminfoPath: join(dir, 'no-such-meminfo') };
 
 describe('selectMemoryProbes', () => {
   it('prefers nvidia-smi when it answers the identity query', () => {
@@ -47,10 +51,26 @@ describe('selectMemoryProbes', () => {
     expect(set.sampleOnce()?.usedMib).toBe(1024);
   });
 
-  it('reports no telemetry with the reason when neither source works', async () => {
+  it('falls back to system memory when there is no GPU telemetry at all', () => {
     const set = selectMemoryProbes('ollama', {
       nvidiaBinary: missingNvidia,
       unified: { ...unified, platform: 'linux' },
+      system,
+    });
+    expect(set.source).toBe('system-memory');
+    expect(set.gpu?.name).toBe('system RAM');
+    expect(set.unavailableReason).toBeNull();
+    expect(set.sampleOnce()).toEqual({
+      freeMib: Math.round(10240000 / 1024),
+      usedMib: Math.round(16000000 / 1024) - Math.round(10240000 / 1024),
+    });
+  });
+
+  it('reports no telemetry with the reason when no source works', async () => {
+    const set = selectMemoryProbes('ollama', {
+      nvidiaBinary: missingNvidia,
+      unified: { ...unified, platform: 'linux' },
+      system: missingSystem,
     });
     expect(set.source).toBe('none');
     expect(set.gpu).toBeNull();
