@@ -103,8 +103,7 @@ via nvidia-smi, Apple Silicon unified memory, and plain system RAM on
 CPU-only boxes. Nothing is estimated.
 
 ```sh
-git clone https://github.com/moonrunnerkc/quantproof && cd quantproof
-npm install && npm run build && npm link   # not on npm yet
+npm install -g quantproof
 
 quantproof ingest my-tasks.md   # a model drafts the pack from your notes
 # or: quantproof init my-task   # scaffold it yourself
