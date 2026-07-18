@@ -125,6 +125,10 @@ of each section.
 - Platform pivot (2026-07-17): the RTX 5070 is out of the picture and its pending measurement gates are dropped from the docs; Apple Silicon (M5 Max, 64 GB) is the primary platform, with unified-memory measurement and a Rapid-MLX (OpenAI-compatible, MLX) backend adapter as the active work. The nvidia-smi path stays in the code for Linux users. The Anthropic API backend is parked, not removed: local backends are the focus and no API key gates anything.
 - Empty-output truncation now flags loudly (trunc! in the tables, a truncation row in the per-candidate block, a footnote in markdown) when a completed unit stops at the max_tokens budget with no visible output: the Mac verification run showed reasoning-style models spending the whole budget on thinking tokens and rendering as a bare 0.000, which reads as task failure when it is a config problem; the signature (done_reason length plus empty output) is unambiguous in stored data, so the report says so and names the fix.
 
+## v0.1.1: three-step flow
+
+- Spec amended first (2026-07-17), per the standing rule that build-plan.md wins disagreements: ingest (5.9) and memory-measured-everywhere (5.5 rewrite) are now spec, with gates in section 13. Driver: first-user friction, authoring the pack was the wall and "not measured" was a shrug where a number belongs.
+
 ## Deferred
 
 - Word-number parsing ("forty-two") for numeric-tolerance.

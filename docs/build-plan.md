@@ -101,7 +101,9 @@ Known limitation to document, not solve, in v0.1: Ollama controls its own GPU of
 
 ### 5.5 Telemetry probes
 
-Two probes, both passive observers of a run. The VRAM probe polls NVML (or nvidia-smi as fallback) at a couple hundred milliseconds during load and generation, recording the peak and the timeline. The timing probe wraps the streaming generation call: time-to-first-token, tokens per second post-first-token, wall time. Warmup generation per model is mandatory and untimed, which absorbs load-time compilation and cache effects. Memory measurement shipped NVIDIA-first (nvidia-smi), but the primary platform is now Apple Silicon: unified-memory measurement and fit logic are current work, not post-traction, and the README states plainly which machines get measured memory. AMD remains post-traction. Quality and latency are measured on every platform either way.
+Two probes, both passive observers of a run. The memory probe records the peak and the timeline during load and generation; the timing probe wraps the streaming generation call: time-to-first-token, tokens per second post-first-token, wall time. Warmup generation per model is mandatory and untimed, which absorbs load-time compilation and cache effects.
+
+Memory is measured on every local run, full stop. Probe selection checks the hardware at run start, never assumes from config or docs: NVIDIA device memory via nvidia-smi where a GPU answers, Apple unified memory via per-process RSS, backend self-accounting where the backend knows better (Rapid-MLX Metal status), and a system-memory fallback (backend process RSS, budget from /proc MemAvailable) on any other box, including CPU-only Linux. "Memory not measured" is retired as an outcome for local backends; the report labels which method produced each number so a CPU-RAM peak is never mistaken for a VRAM peak. Not-applicable remains the correct label for API runs, where inference happens on someone else's hardware. Fit verdicts compare predicted peak against the winning probe's measured available budget, so a box with 10 GB free RAM gets a real "will not fit" verdict on a 19 GB model instead of "unknown".
 
 ### 5.6 Scorers
 
@@ -125,11 +127,19 @@ Store: SQLite, one file per project under `.quantproof/`. Chosen over JSONL beca
 
 Reporting: three renderers off the same result records. Terminal table for the daily loop. Markdown report for sharing (this is the case-study artifact, so its layout gets real design attention: results table, Pareto summary, recommendation with reasoning, environment block, reproduction command). Result bundle (zip of report, raw outputs, run metadata) for reproducibility claims. Recommendation logic: filter candidates that pass all gate scorers, compute the quality/VRAM/latency Pareto frontier, recommend the smallest-VRAM candidate within a configurable tolerance (default 2%) of best measured quality, and say why in one sentence.
 
+### 5.9 Pack drafter (ingest)
+
+`quantproof ingest <file> [dir]` turns a freeform task document (markdown, plain text, notes exported from anywhere) into a ready-to-run pack, collapsing the authoring step that used to be manual. The end-to-end flow becomes three steps: ingest, run, report.
+
+How it works: a drafting model (a local backend model, chosen the same way run candidates are) reads the source document and proposes the pack: task name, type, the deterministic scorer that fits, scorer params, prompt template, and 20+ examples with expected values. The draft is then validated by the exact same strict loader every hand-written pack goes through; validation failures are fed back to the drafter for a bounded number of repair rounds, and a draft that still fails is written to disk anyway with the errors printed, so the user fixes two fields instead of starting from scratch.
+
+The credibility line this must never cross: scoring stays deterministic. The drafting model authors the pack; it never judges an output. Because model-authored expected values measure agreement with the drafter unless a human checks them, every ingested pack records provenance (source file hash, drafting model, date) in the manifest, the ingest summary says plainly what was inferred and that examples should be reviewed, and every report rendered from a drafted pack carries the provenance label until the pack is marked reviewed. Documents with no explicit input/expected pairs (a list of workflows, say) are handled by deriving the closest deterministically scorable task, typically classification over the document's own categories, with synthesized inputs; that derivation is exactly what provenance flags exist for.
+
 ## 6. Run Lifecycle (Happy Path and Failure Paths)
 
 Happy path: `quantproof run` loads the task pack, resolves candidates, fit-predicts, prints the plan (what will run, what's skipped as too big, rough time estimate), then per candidate: pull if needed, load, warmup, run all examples x repetitions with probes attached, force unload, cooldown, journal. At the end, score, aggregate, render, print the recommendation.
 
-Failure paths: backend crash mid-model marks remaining units for that model as OOM-suspect and moves on; the resume command re-attempts only unfinished non-OOM work. Ollama unreachable fails fast at plan time with the exact command to fix it. An example whose expected file fails validation aborts before any inference, listing every invalid example at once instead of one per run. VRAM probe unavailable (no NVML) degrades to a run without memory measurements, loudly marked as such in the report, never silently.
+Failure paths: backend crash mid-model marks remaining units for that model as OOM-suspect and moves on; the resume command re-attempts only unfinished non-OOM work. Ollama unreachable fails fast at plan time with the exact command to fix it. An example whose expected file fails validation aborts before any inference, listing every invalid example at once instead of one per run. Probe selection always lands on a working probe (the system-memory fallback runs anywhere); a probe that dies mid-run degrades to nulls for the affected units, loudly marked in the report, never silently.
 
 ## 7. Tech Stack and Rationale
 
@@ -164,7 +174,12 @@ quantproof/
 │   │   ├── command-resume.ts
 │   │   ├── command-report.ts
 │   │   ├── command-models.ts      # list candidates + fit predictions
-│   │   └── command-init.ts        # scaffold a task pack interactively
+│   │   ├── command-init.ts        # scaffold a task pack interactively
+│   │   └── command-ingest.ts      # draft a pack from a freeform document
+│   ├── ingest/
+│   │   ├── draft-prompt.ts        # instructions handed to the drafting model
+│   │   ├── draft-parser.ts        # model output -> pack files, strictly checked
+│   │   └── pack-writer.ts         # writes the pack + provenance to disk
 │   ├── tasks/
 │   │   ├── task-schema.ts         # pack manifest validation
 │   │   ├── task-loader.ts
@@ -177,7 +192,10 @@ quantproof/
 │   │   ├── backend-adapter.ts     # interface + shared types
 │   │   └── ollama-adapter.ts
 │   ├── telemetry/
+│   │   ├── probe-select.ts        # hardware-checked probe chain, one place
 │   │   ├── vram-probe.ts          # NVML/nvidia-smi polling
+│   │   ├── unified-memory-probe.ts # Apple Silicon per-process RSS
+│   │   ├── system-memory-probe.ts # CPU-only fallback: RSS + MemAvailable
 │   │   └── timing-probe.ts        # TTFT, tokens/sec, wall time
 │   ├── scoring/
 │   │   ├── scorer-registry.ts
@@ -242,3 +260,10 @@ Ordered by expected leverage: llama-server adapter with explicit offload control
 ## 12. Definition of Done for v0.1.0
 
 One command from clean machine to recommendation: install Ollama, `npx quantproof init`, add examples, `npx quantproof run`. Three starter packs. Scorer suite fully tested. Sweep survives OOM. Report is share-ready. Methodology documented with limits stated. README under 50 lines led by the case study. No comparison tables against anyone. Hardware limits of memory measurement stated plainly per platform. Everything else is v0.2.
+
+## 13. v0.1.1: The Three-Step Flow
+
+Post-launch usability pass, driven by real first-user friction: authoring the pack was the wall, and "memory not measured" on non-NVIDIA, non-Mac hardware was a shrug where a number belongs. Two deliverables, same end goal as ever (run your real task on quantized models, get measured quality, latency, and peak memory, plus the smallest quant that holds quality):
+
+1. **Ingest** (5.9): `quantproof ingest ~/Downloads/my-tasks.md && quantproof run --pack my-tasks && quantproof report --markdown` is the whole story. Gate: a freeform real-world document with no input/expected pairs ingests into a pack that passes `quantproof validate` untouched, provenance is visible in the manifest, the ingest summary, and every rendered report, and the drafting model never appears anywhere in scoring.
+2. **Memory measured everywhere** (5.5): the probe chain ends in a system-memory fallback, so every local run reports a real peak with its measurement method labeled, and fit verdicts on GPU-less boxes come from actual available memory. Gate: on a CPU-only Linux box, `quantproof models` prints real fit verdicts against measured available memory, a sweep records a real peak per candidate with the method labeled, and the string "not measured" appears nowhere in any renderer's local-backend output.
