@@ -50,12 +50,43 @@ QuantProof automates that process. It:
 
 ## Case study
 
-<!-- LAUNCH DATA GOES HERE: the Apple Silicon study (3 packs, quant
-     ladder, Ollama vs Rapid-MLX on an M5 Max), table and
-     recommendation verbatim from report --markdown. -->
+Three task packs, two backends, one machine: an Apple M5 Max (64 GB)
+running gemma3:1b (Q4_K_M) and gemma4:e4b (Q8_0) via Ollama 0.24.0,
+and qwen3-coder:30b-a3b via Rapid-MLX 0.6.0. Full packs, 20 examples
+x 3 repetitions per model, 540 scored generations. Every number below
+is measured; the six full reports are in
+[docs/case-study/](docs/case-study/).
 
-Results forthcoming. The report below is exactly what QuantProof prints,
-unedited.
+| task pack | model | quality | pass | TTFT ms | tok/s | peak MiB |
+| --- | --- | --- | ---: | ---: | ---: | ---: |
+| ticket-classification | gemma4:e4b Q8_0 | **0.950** | 95% | 167 | 75 | 12335 |
+| ticket-classification | qwen3-coder:30b | 0.900 | 90% | 63 | 102 | 27576 |
+| ticket-classification | gemma3:1b Q4_K_M | 0.800 | 80% | 149 | 218 | 1514 |
+| invoice-extraction | qwen3-coder:30b | **1.000** | 100% | 64 | 100 | 28754 |
+| invoice-extraction | gemma3:1b Q4_K_M | 0.150 | 15% | 147 | 246 | 1526 |
+| invoice-extraction | gemma4:e4b Q8_0 | 0.000 | 0% | 6909 | 68 | 12506 |
+| config-generation | gemma4:e4b Q8_0 | **1.000** | 100% | 155 | 67 | 12434 |
+| config-generation | qwen3-coder:30b | 1.000 | 100% | 66 | 100 | 29573 |
+| config-generation | gemma3:1b Q4_K_M | 0.750 | 75% | 144 | 244 | 1520 |
+
+What the data says:
+
+- **No single model won all three tasks.** The 8B Q8 beat the 30B on
+  classification at 45% of the memory, the 30B was alone at 1.000 on
+  extraction, and they tied on config generation, where the 8B needs
+  17 GiB less. This is why the tool runs your task instead of quoting
+  a leaderboard.
+- **A zero is not always a quality result.** e4b's 0.000 on extraction
+  is flagged `trunc!`: 57 of 60 generations spent the whole 512-token
+  budget on reasoning and never emitted content. The report names the
+  fix (raise `max_tokens`) instead of letting the zero smear the model.
+- **Predictions were checked against measurements.** e4b's measured
+  peaks landed within 2.2% of the fit predictions on every pack;
+  gemma3:1b ran 18 to 20% under its deliberately conservative ones.
+- **Rapid-MLX repetitions differed byte-for-byte** on extraction
+  (flagged nondeterministic) yet all 60 scored 1.000: the wording
+  varied, the extracted fields did not. Deterministic scoring is what
+  makes that distinction visible.
 
 ## Run it on your task
 
@@ -84,8 +115,9 @@ quantproof run --pack my-task
 
 The sweep:
 
-- Tests every model already downloaded in Ollama (or a specific list
-  provided with `--config`)
+- Tests every model already downloaded in Ollama, or whatever a
+  Rapid-MLX server is serving, or a specific list provided with
+  `--config`
 - Treats out-of-memory failures as recorded results instead of crashing
 
 Generate a shareable report with:

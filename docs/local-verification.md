@@ -43,10 +43,13 @@ lands.
    30B, where process RSS misleadingly reads 1.3 GiB). Reports label
    the backend in every row and environment line.
 
-## Open gate
+## Closed gate (2026-07-17, same day)
 
-**Backend comparison study.** Same task packs, Ollama versus Rapid-MLX
-on the M5 Max: the Mac case study for the README.
+**Backend comparison study: closed.** Three packs times three models
+across both backends on the M5 Max, 540 scored generations, zero
+failed units. Summary in the README case study; the six full reports
+are in [docs/case-study/](case-study/), reproducible from the two
+config files at the repo root.
 
 ## Not needed anywhere
 

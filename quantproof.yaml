@@ -1,0 +1,5 @@
+backend: ollama
+candidates:
+  - gemma4:e4b-it-q8_0
+  - gemma3:1b
+use_local_models: false
