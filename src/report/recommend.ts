@@ -103,7 +103,7 @@ function pickReason(
       ? `${footprint.mib(pick).toFixed(0)} MiB peak memory`
       : `${footprint.mib(pick).toFixed(0)} MiB weights on disk (peak memory was not measured on this run)`;
   if (pick === best) {
-    return `${pick.candidate.modelName} has both the best measured quality (${quality(pick).toFixed(3)}) and the smallest footprint (${size}) among gate-passing candidates.`;
+    return `${pick.candidate.modelName} has the best measured quality (${quality(pick).toFixed(3)}) and the smallest footprint (${size}) among the candidates within the quality tolerance.`;
   }
   return (
     `${pick.candidate.modelName} holds quality ${quality(pick).toFixed(3)}, within ${(tolerance * 100).toFixed(0)}% of the best ` +
