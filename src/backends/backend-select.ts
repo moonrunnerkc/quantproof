@@ -9,6 +9,7 @@
 import { ANTHROPIC_BACKEND_PREFIX, AnthropicAdapter } from './anthropic-adapter.js';
 import type { BackendAdapter } from './backend-adapter.js';
 import { OllamaAdapter } from './ollama-adapter.js';
+import { RAPID_MLX_BACKEND_PREFIX, RapidMlxAdapter } from './rapid-mlx-adapter.js';
 import type { BackendKind } from '../catalog/run-config.js';
 import type { VramProbe } from '../telemetry/vram-probe.js';
 
@@ -36,7 +37,10 @@ export function isApiBackend(backendVersion: string): boolean {
  * @returns The adapter.
  */
 export function createAdapter(kind: BackendKind, baseUrl?: string): BackendAdapter {
-  return kind === 'anthropic' ? new AnthropicAdapter(baseUrl) : new OllamaAdapter(baseUrl);
+  if (kind === 'anthropic') {
+    return new AnthropicAdapter(baseUrl);
+  }
+  return kind === 'rapid-mlx' ? new RapidMlxAdapter(baseUrl) : new OllamaAdapter(baseUrl);
 }
 
 /**
@@ -47,7 +51,10 @@ export function createAdapter(kind: BackendKind, baseUrl?: string): BackendAdapt
  * @returns The backend kind.
  */
 export function backendKindOf(backendVersion: string): BackendKind {
-  return isApiBackend(backendVersion) ? 'anthropic' : 'ollama';
+  if (isApiBackend(backendVersion)) {
+    return 'anthropic';
+  }
+  return backendVersion.startsWith(RAPID_MLX_BACKEND_PREFIX) ? 'rapid-mlx' : 'ollama';
 }
 
 /**

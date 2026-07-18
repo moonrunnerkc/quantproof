@@ -7,6 +7,7 @@
 
 import { AnthropicAdapter } from '../backends/anthropic-adapter.js';
 import { OllamaAdapter } from '../backends/ollama-adapter.js';
+import { RapidMlxAdapter } from '../backends/rapid-mlx-adapter.js';
 import type { BackendAdapter } from '../backends/backend-adapter.js';
 import type { BackendKind } from '../catalog/run-config.js';
 import { DEFAULT_RUN_CONFIG, loadRunConfig } from '../catalog/run-config.js';
@@ -37,11 +38,28 @@ async function listAnthropicModels(baseUrl?: string): Promise<string> {
   const models = await adapter.listModels();
   const lines = [
     `${String(models.length)} model${models.length === 1 ? '' : 's'} | ${backendVersion}`,
-    'inference runs on Anthropic hardware; local fit and VRAM do not apply to this backend',
+    'inference runs on Anthropic hardware; local fit and memory do not apply to this backend',
     '',
     ...models.map((m) => `  ${m.name}`),
     '',
     'sweep them by listing ids in a config file: backend: anthropic, candidates: [<id>, ...]',
+  ];
+  const text = lines.join('\n');
+  console.log(text);
+  return text;
+}
+
+async function listRapidMlxModels(baseUrl?: string): Promise<string> {
+  const adapter = new RapidMlxAdapter(baseUrl);
+  const backendVersion = await adapter.version();
+  const models = await adapter.listModels();
+  const lines = [
+    `${String(models.length)} model${models.length === 1 ? '' : 's'} served | ${backendVersion}`,
+    'rapid-mlx exposes no weight files, so fit is not predicted; memory is measured during the run',
+    '',
+    ...models.map((m) => `  ${m.name}`),
+    '',
+    'sweep with a config file: backend: rapid-mlx (candidates defaults to everything served)',
   ];
   const text = lines.join('\n');
   console.log(text);
@@ -59,6 +77,9 @@ async function listAnthropicModels(baseUrl?: string): Promise<string> {
 export async function modelsCommand(options: ModelsCommandOptions): Promise<string> {
   if (options.backend === 'anthropic') {
     return listAnthropicModels(options.baseUrl);
+  }
+  if (options.backend === 'rapid-mlx') {
+    return listRapidMlxModels(options.baseUrl);
   }
   const adapter = options.adapter ?? new OllamaAdapter(options.baseUrl);
   const backendVersion = await adapter.version();

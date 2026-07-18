@@ -45,7 +45,16 @@ describe('loadRunConfig', () => {
 
   it('rejects an unknown backend naming the valid options', () => {
     const path = configFile('bad-backend.yaml', 'backend: openai\ncandidates: [x]\n');
-    expect(() => loadRunConfig(path)).toThrow(/"backend" must be "ollama" or "anthropic"/);
+    expect(() => loadRunConfig(path)).toThrow(/"backend" must be "ollama", "rapid-mlx", or "anthropic"/);
+  });
+
+  it('accepts the rapid-mlx backend and defaults to sweeping the served models', () => {
+    const path = configFile('rapid.yaml', 'backend: rapid-mlx\n');
+    expect(loadRunConfig(path)).toEqual({
+      backend: 'rapid-mlx',
+      candidates: [],
+      useLocalModels: true,
+    });
   });
 
   it('rejects use_local_models on the anthropic backend with an example fix', () => {

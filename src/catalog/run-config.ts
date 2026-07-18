@@ -3,7 +3,8 @@
  * sweep. Shape is deliberately minimal (documented in
  * docs/run-config.md):
  *
- *   backend: ollama        # or "anthropic" for the API backend
+ *   backend: ollama        # "rapid-mlx" for a local MLX server, or
+ *                          # "anthropic" for the API backend
  *   candidates:            # models to evaluate, pulled on demand
  *     - gemma3:1b
  *     - qwen3:4b
@@ -14,7 +15,7 @@ import { readFileSync } from 'node:fs';
 import { parse as parseYaml } from 'yaml';
 
 /** Which adapter a sweep runs against. */
-export type BackendKind = 'ollama' | 'anthropic';
+export type BackendKind = 'ollama' | 'rapid-mlx' | 'anthropic';
 
 /** A validated run config. */
 export interface RunConfig {
@@ -66,9 +67,9 @@ export function loadRunConfig(path: string): RunConfig {
   const record = doc as Record<string, unknown>;
 
   const backendRaw = record['backend'] ?? 'ollama';
-  if (backendRaw !== 'ollama' && backendRaw !== 'anthropic') {
+  if (backendRaw !== 'ollama' && backendRaw !== 'rapid-mlx' && backendRaw !== 'anthropic') {
     throw new Error(
-      `${path}: "backend" must be "ollama" or "anthropic", got ${JSON.stringify(backendRaw)}`,
+      `${path}: "backend" must be "ollama", "rapid-mlx", or "anthropic", got ${JSON.stringify(backendRaw)}`,
     );
   }
 
@@ -80,7 +81,9 @@ export function loadRunConfig(path: string): RunConfig {
     throw new Error(`${path}: "candidates" must be a list of model names like "gemma3:1b"; fix it and rerun`);
   }
 
-  const useLocalRaw = record['use_local_models'] ?? (backendRaw === 'ollama');
+  // rapid-mlx defaults to sweeping whatever the server is serving,
+  // which mirrors the ollama local-store default.
+  const useLocalRaw = record['use_local_models'] ?? (backendRaw !== 'anthropic');
   if (typeof useLocalRaw !== 'boolean') {
     throw new Error(`${path}: "use_local_models" must be true or false`);
   }

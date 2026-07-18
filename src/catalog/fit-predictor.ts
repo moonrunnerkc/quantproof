@@ -51,6 +51,27 @@ export function notApplicableFit(): FitPrediction {
 }
 
 /**
+ * The fit verdict for local backends that expose no weight files or
+ * architecture metadata (Rapid-MLX): prediction is impossible but
+ * memory is still measured during the run, so the verdict is unknown
+ * rather than not-applicable.
+ *
+ * @param reason - One sentence saying why prediction is impossible.
+ * @returns A prediction whose verdict is "unknown".
+ */
+export function unpredictableFit(reason: string): FitPrediction {
+  return {
+    verdict: 'unknown',
+    reason,
+    predictedPeakMib: null,
+    weightsMib: 0,
+    kvCacheMib: null,
+    overheadMib: 0,
+    freeVramMib: null,
+  };
+}
+
+/**
  * KV cache size for a context length, in MiB.
  *
  * blocks x kv_heads x (key_len + value_len) x context x 2 bytes (f16),

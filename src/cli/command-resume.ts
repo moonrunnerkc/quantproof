@@ -62,7 +62,10 @@ export async function resumeCommand(options: ResumeCommandOptions): Promise<stri
           `${String(prepared.entries.reduce((n, e) => n + e.units.length, 0))} pending units`,
       );
       const kind = backendKindOf(run.backendVersion);
-      const probes = selectMemoryProbes(kind);
+      const probes = selectMemoryProbes(
+        kind,
+        options.baseUrl === undefined ? {} : { rapidMlxUrl: options.baseUrl },
+      );
       const sweepOptions: SweepOptions = {
         adapter: createAdapter(kind, options.baseUrl),
         store,

@@ -7,7 +7,7 @@ import { OllamaAdapter } from '../backends/ollama-adapter.js';
 import type { ModelDescriptor } from '../backends/backend-adapter.js';
 import { createAdapter } from '../backends/backend-select.js';
 import { DEFAULT_RUN_CONFIG, loadRunConfig } from '../catalog/run-config.js';
-import { notApplicableFit } from '../catalog/fit-predictor.js';
+import { notApplicableFit, unpredictableFit } from '../catalog/fit-predictor.js';
 import { resolveCandidates } from '../catalog/model-resolver.js';
 import { executeSweep, prepareSweepJournal } from '../orchestrator/run-executor.js';
 import type { SweepOptions } from '../orchestrator/run-executor.js';
@@ -82,20 +82,31 @@ export async function runCommand(options: RunCommandOptions): Promise<string> {
     descriptors = resolved.candidates;
   }
   if (descriptors.length === 0) {
-    throw new Error(
-      config.backend === 'anthropic'
-        ? 'no candidates to run; list model ids in the config file, e.g. candidates: [claude-haiku-4-5, claude-sonnet-4-5]'
-        : 'no candidates to run; pull a model (ollama pull gemma3:1b), pass --model, or list candidates in a --config file',
-    );
+    const fixes: Record<typeof config.backend, string> = {
+      anthropic: 'no candidates to run; list model ids in the config file, e.g. candidates: [claude-haiku-4-5, claude-sonnet-4-5]',
+      'rapid-mlx': 'no candidates to run; Rapid-MLX serves nothing, start it with: rapid-mlx serve <model>',
+      ollama: 'no candidates to run; pull a model (ollama pull gemma3:1b), pass --model, or list candidates in a --config file',
+    };
+    throw new Error(fixes[config.backend]);
   }
 
-  const probes = selectMemoryProbes(config.backend);
+  const probes = selectMemoryProbes(
+    config.backend,
+    options.baseUrl === undefined ? {} : { rapidMlxUrl: options.baseUrl },
+  );
   const gpu = probes.gpu;
   const freeVramMib = probes.sampleOnce()?.freeMib ?? null;
   const assessments =
     adapter instanceof OllamaAdapter
       ? await assessCandidates(adapter, descriptors, pack.manifest.generation.context, freeVramMib)
-      : descriptors.map((descriptor) => ({ descriptor, architecture: null, fit: notApplicableFit() }));
+      : descriptors.map((descriptor) => ({
+          descriptor,
+          architecture: null,
+          fit:
+            config.backend === 'rapid-mlx'
+              ? unpredictableFit('rapid-mlx exposes no weight files or architecture metadata, so fit cannot be predicted; memory is measured during the run')
+              : notApplicableFit(),
+        }));
   // An explicitly named model is always attempted: naming it is the override.
   const force = (options.force ?? false) || options.model !== undefined;
   const plan = buildRunPlan(assessments, {
