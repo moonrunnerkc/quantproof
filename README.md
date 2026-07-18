@@ -3,6 +3,10 @@
 </p>
 
 <p align="center">
+  <a href="https://www.npmjs.com/package/quantproof"><img src="https://img.shields.io/npm/v/quantproof" alt="npm version"></a>
+</p>
+
+<p align="center">
   <a href="#why-measure">Why measure</a> ·
   <a href="#how-it-works">How it works</a> ·
   <a href="#case-study">Case study</a> ·
