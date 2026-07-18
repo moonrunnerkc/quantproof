@@ -6,9 +6,39 @@ results, and the scorer that decides whether an output is right. Packs
 are the unit people share; everything in one is plain YAML, JSON, and
 text so a pack can be diffed, reviewed, and PRed.
 
-Scaffold one with `quantproof init`, check it with
-`quantproof validate <dir>`. Validation reports every problem in one
-pass, each with the file and the fix.
+Three ways to get one: `quantproof ingest <file>` drafts a complete
+pack from a freeform document (notes, a task list, a runbook) using a
+local model; `quantproof init` scaffolds one to fill in by hand; or
+copy a shared pack. Check any of them with `quantproof validate <dir>`.
+Validation reports every problem in one pass, each with the file and
+the fix.
+
+## Ingest and provenance
+
+`quantproof ingest ~/Downloads/my-tasks.md` picks the largest local
+model that fits in memory (override with `--model`), has it propose the
+whole pack (name, scorer, prompt, 20+ examples with expected values),
+re-validates the proposal with the same strict loader hand-written
+packs go through, and gives the model up to two repair rounds on the
+collected errors. A draft that still fails is written as-is with the
+errors printed, so you fix two fields instead of starting over.
+
+The pack it writes carries a `provenance` block:
+
+```yaml
+provenance:
+  source: my-tasks.md
+  source_sha256: <hash of the document at drafting time>
+  drafted_by: gemma3:4b (ollama 0.23.1)
+  drafted_at: 2026-07-17
+  reviewed: false
+```
+
+Until you set `reviewed: true`, every report rendered from the pack
+says so, loudly: expected values a model invented measure agreement
+with that model, not correctness, and the label only clears when a
+human has checked the examples. Scoring itself stays deterministic
+either way; the drafting model never judges an output.
 
 ## Layout
 

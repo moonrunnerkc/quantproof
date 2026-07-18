@@ -97,20 +97,21 @@ Requirements:
   Windows) or [Rapid-MLX](https://github.com/raullenchai/Rapid-MLX)
   (Apple Silicon)
 
-Quality and latency are measured on every machine. Peak memory is
-measured on Apple Silicon (unified memory) and on NVIDIA GPUs
-(nvidia-smi); anywhere else the memory columns are clearly marked
-"not measured", never estimated.
+Quality, latency, and peak memory are measured on every machine, with
+the method checked at run time and labeled in the report: NVIDIA GPUs
+via nvidia-smi, Apple Silicon unified memory, and plain system RAM on
+CPU-only boxes. Nothing is estimated.
 
 ```sh
 git clone https://github.com/moonrunnerkc/quantproof && cd quantproof
 npm install && npm run build && npm link   # not on npm yet
 
-quantproof init my-task     # scaffold: prompts, examples, scorer
+quantproof ingest my-tasks.md   # a model drafts the pack from your notes
+# or: quantproof init my-task   # scaffold it yourself
 
-# Replace the two placeholder examples with 20+ real ones
+# Review the drafted examples (they are model-authored until you check them)
 
-quantproof run --pack my-task
+quantproof run --pack my-tasks
 ```
 
 The sweep:

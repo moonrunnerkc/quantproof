@@ -21,8 +21,20 @@ Read these before citing a quantproof report.
   approximation of the Metal working set, not an allocator trace.
   Rapid-MLX: the server's own Metal accounting at `/v1/status`,
   because MLX Metal buffers do not appear in process RSS at all.
-  Everything else (AMD, CPU-only Linux, Windows without NVIDIA): runs
-  execute with memory reported as "not measured", never estimated.
+  Everything else with a readable `/proc/meminfo` (AMD, CPU-only
+  Linux): the backend's summed process RSS, same sampling as the Apple
+  path, with the fit budget taken from the kernel's `MemAvailable`.
+  These numbers are system RAM, not VRAM, and every report labels the
+  measurement method so they are never confused. Only a machine where
+  no source works at all (no nvidia-smi, not macOS, no /proc) reports
+  "not measured", never estimated.
+- **A drafted pack measures agreement with its drafter until a human
+  reviews it.** `quantproof ingest` uses a local model to author the
+  pack, including the expected values. Scoring stays deterministic and
+  the drafting model never judges an output, but a wrong expected value
+  makes a right answer score zero, so every report from a drafted pack
+  carries a provenance label until `provenance.reviewed: true` is set
+  in task.yaml after checking the examples.
 - **The Apple Silicon fit budget is a heuristic.** Fit predictions on
   unified memory compare against 75% of physical RAM (Metal's
   working-set convention) minus the backend's resident memory. Other
