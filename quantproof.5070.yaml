@@ -1,0 +1,4 @@
+backend: ollama
+candidates:
+  - gemma3:4b
+use_local_models: true
