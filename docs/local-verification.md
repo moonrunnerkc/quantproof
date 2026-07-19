@@ -1,11 +1,11 @@
 # Local verification: what still needs a live machine
 
-The primary platform is Apple Silicon (dev machine: M5 Max, 64 GB
-unified memory). The NVIDIA/nvidia-smi measurement path stays in the
-code for Linux users, but nothing is gated on NVIDIA hardware anymore.
-The Anthropic API backend is parked: it stays in the code and its
-tests, but local backends (Ollama, Rapid-MLX) are the focus and no API
-key is required for anything below.
+Two verified platforms: the Apple Silicon M5 Max (64 GB unified
+memory) and the Linux RTX 5070 desktop (12 GB, nvidia-smi path), which
+is the current dev machine. The Anthropic API backend is parked: it
+stays in the code and its tests, but local backends (Ollama,
+Rapid-MLX) are the focus and no API key is required for anything
+below.
 
 ## Setup
 
@@ -50,6 +50,26 @@ across both backends on the M5 Max, 540 scored generations, zero
 failed units. Summary in the README case study; the six full reports
 are in [docs/case-study/](case-study/), reproducible from the two
 config files at the repo root.
+
+## Closed gates (2026-07-19, live on the RTX 5070)
+
+Full detail in
+[local-verification-results-5070.md](local-verification-results-5070.md).
+
+1. **NVIDIA VRAM measurement: closed.** First live run of the
+   nvidia-smi path: measured peaks on every candidate, predicted
+   versus measured deltas of -7.3% to -11.0% on the 4B and 8B models
+   (inside the phase 2 gate's 15% band) and -22.4% on gemma3:1b, the
+   same deliberate conservative bias the Mac measured on that model.
+2. **Three-step flow on a real document: closed.** ingest, review,
+   run, report, bundle, all verified end to end, including the repair
+   rounds, the salvage path, and the provenance label on every report
+   surface. 264/264 units completed; the bundle re-scored identically
+   from its own contents.
+3. **CUDA determinism finding:** seeded temperature-0 repetitions are
+   not byte-identical on this stack (ollama 0.15.2, driver 590.48.01)
+   for llama3.1 and gemma3:4b; gemma3:1b held. The nondet flag caught
+   and labeled it in every surface, which is the designed behavior.
 
 ## Not needed anywhere
 

@@ -147,6 +147,18 @@ of each section.
   - The ingest summary only prints the labels/key-fields shorthand when the param exists, so salvaged drafts no longer print "labels: undefined".
   - provenanceLabel moved below wrapLine in format.ts so wrapLine's JSDoc reattaches to its declaration.
 
+## End-to-end verification on the RTX 5070 (2026-07-19)
+
+- Platform note: the RTX 5070 desktop is the current dev and measurement machine again (CLAUDE.md updated); the M5 Max stays a verified platform with its results in the mac results doc. The "out of the picture" line from the platform pivot is superseded, not rewritten.
+- Three unit tests simulating CPU-only boxes failed here because they left the real /dev/nvidia0 check active; fixed by injecting nvidiaDevicePaths: [] like their sibling tests. Tests that simulate hardware must pin every probe input.
+- First live NVIDIA-path verification: measured peaks on all four candidates, deltas -7.3/-8.5/-11.0/-22.4% versus prediction. The phase 2 "within 15%" gate holds on the 4B and 8B models; gemma3:1b overshoots for the same reason the Mac measured (fixed 1024 MiB allowance dominates sub-1B predictions).
+- Live ingest of a real freeform document exposed a scoring-dead-end: an exact-label draft whose prompt never names the labels lets models invent their own categories and zero the whole sweep. parseDraft now requires every declared label to appear in the prompt (case-insensitive), pushing the failure into the repair rounds; the drafting guide states the rule.
+- llama3.1:latest as drafter never complied with the label-in-prompt rule across three attempts; the salvage path wrote the pack with the error printed and the prompt was fixed by hand in review. Small drafters fail loudly now instead of producing silently unmeasurable packs.
+- Drafter-authored expected values were wrong in 2 of 18 examples (first draft) and 1 of 22 (second); each was caught by checking against the source document in the review step. This is the measured version of the provenance warning.
+- CUDA determinism: seeded temperature-0 repetitions differ byte-for-byte on this stack (ollama 0.15.2, driver 590.48.01) for llama3.1 (both quants) and gemma3:4b, while gemma3:1b is byte-identical; the nondet flag surfaced it everywhere. Recorded as a backend property with the version labeled; whether newer Ollama behaves better on CUDA is unmeasured (no sudo on this box to upgrade).
+- The e2e sweep, report, and bundle results live in docs/e2e-5070-report.md and docs/local-verification-results-5070.md; the drafted pack itself stays untracked because it was generated from a personal task document, and quantproof.5070.yaml ships as the reproduction config.
+- README case study left untouched: it is the Mac launch artifact; 5070 verification lives in the verification docs.
+
 ## Deferred
 
 - An ingest e2e slice (live Ollama, tiny model) alongside the existing self-gating e2e suites: this box is off-limits for sustained CPU inference, and an e2e that was never run stays unwritten per the verify-before-presenting rule; write and run it on the Mac.
