@@ -113,6 +113,9 @@ quantproof ingest my-tasks.md   # a model drafts the pack from your notes
 # or: quantproof init my-task   # scaffold it yourself
 
 # Review the drafted examples (they are model-authored until you check them)
+# Drafting quality tracks the drafting model: use the largest model you
+# have (the default) or pass --model; small models may need the printed
+# repair notes fixed by hand.
 
 quantproof run --pack my-tasks
 ```

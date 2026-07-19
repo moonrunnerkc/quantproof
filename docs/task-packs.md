@@ -23,6 +23,14 @@ packs go through, and gives the model up to two repair rounds on the
 collected errors. A draft that still fails is written as-is with the
 errors printed, so you fix two fields instead of starting over.
 
+Drafting quality tracks the drafting model. An 8B-class model can
+propose sound examples yet ignore instructions the validator enforces
+(a live run watched one refuse, across all three attempts, to name the
+label set in the prompt); the errors are printed and the fix is usually
+one hand edit. A larger drafter gets it right in one pass more often,
+and either way the review step below is not optional: expect a wrong
+expected value or two per draft.
+
 The pack it writes carries a `provenance` block:
 
 ```yaml
