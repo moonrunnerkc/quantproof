@@ -159,6 +159,15 @@ of each section.
 - The e2e sweep, report, and bundle results live in docs/e2e-5070-report.md and docs/local-verification-results-5070.md; the drafted pack itself stays untracked because it was generated from a personal task document, and quantproof.5070.yaml ships as the reproduction config.
 - README case study left untouched: it is the Mac launch artifact; 5070 verification lives in the verification docs.
 
+## Release 0.1.1
+
+- Ollama upgraded 0.15.2 to 0.32.1 on the 5070 (user-run installer); the identical sweep completed 264/264 with no code changes, so the adapter's plain-HTTP surface holds across the runtime rewrite. The committed e2e report now reflects 0.32.1.
+- CUDA determinism re-measured on 0.32.1: llama3.1 (both quants) became byte-identical, gemma3:1b became nondeterministic, gemma3:4b stayed nondeterministic. Recorded as a version-sensitive backend property; the per-sweep check is the only defensible stance and the docs now show the flip.
+- The two 8B quants swapped quality ranking between backend versions (0.576/0.515 then 0.545/0.591); documented as within-noise for a 22-example pack rather than pretending the ordering is stable.
+- quantproof.5070.yaml pinned to the explicit four-candidate ladder with use_local_models false: the upgraded service uses the machine's original store, which holds unrelated models that would have diluted the comparison; an explicit list is also the honest reproduction config.
+- README and task-packs now say plainly that drafting quality tracks the drafting model and the review step is not optional; driven by watching an 8B drafter ignore the label-in-prompt rule three times.
+- Version 0.1.1 (package.json and the commander version string, which is hardcoded in main.ts and must move with it), changelog entry covering everything since the v0.1.0 tag (ingest, memory everywhere, rapid-mlx, truncation flags, the prompt-coverage check). npm publish requires credentials this box does not hold, so the publish and the post-publish cold install are the user's two commands; the packed tarball was cold-installed into a scratch project here as the pre-publish check.
+
 ## Deferred
 
 - An ingest e2e slice (live Ollama, tiny model) alongside the existing self-gating e2e suites: this box is off-limits for sustained CPU inference, and an e2e that was never run stays unwritten per the verify-before-presenting rule; write and run it on the Mac.

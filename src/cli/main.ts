@@ -27,7 +27,7 @@ program
   .description(
     'Runs your real task examples against local quantized models via Ollama and recommends the smallest quant that holds quality.',
   )
-  .version('0.1.0');
+  .version('0.1.1');
 
 program
   .command('validate')

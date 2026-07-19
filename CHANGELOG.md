@@ -1,5 +1,41 @@
 # Changelog
 
+## 0.1.1 (2026-07-19)
+
+The three-step flow: ingest, run, report.
+
+- `quantproof ingest <file>`: a local model drafts a complete runnable
+  pack (name, scorer, prompt, 20+ examples with expected values) from a
+  freeform document, re-validated by the same strict loader as
+  hand-written packs, with bounded repair rounds and a salvage path
+  that writes a failing draft anyway with its errors printed. Drafted
+  packs carry a provenance block (source hash, drafting model, date,
+  reviewed flag), and every report surface labels results from an
+  unreviewed draft. Scoring never involves the drafting model.
+- exact-label drafts must name every declared label in the prompt; a
+  draft that does not is rejected into the repair rounds instead of
+  producing a sweep where models invent their own categories and
+  everything scores zero (found by a live end-to-end run).
+- Memory measured everywhere: probe selection checks the hardware at
+  run start and always lands on an honest source. NVIDIA GPUs via
+  nvidia-smi, Apple Silicon via summed backend process RSS (validated
+  against Ollama's own accounting), Rapid-MLX via the server's Metal
+  accounting at /v1/status, and any other box with a readable
+  /proc/meminfo via backend RSS with the fit budget from MemAvailable.
+  An NVIDIA device without nvidia-smi refuses to measure rather than
+  passing RSS off as VRAM. Fit verdicts on GPU-less boxes come from
+  real available memory.
+- Rapid-MLX backend (`backend: rapid-mlx`): sweeps against a local
+  OpenAI-compatible MLX server, prompt cache cleared before every
+  generation so latency measures fresh inference.
+- Truncation flagged: a completed unit that spends its whole
+  max_tokens budget without emitting visible output is marked in every
+  renderer with the fix named (raise generation.max_tokens), instead
+  of rendering as a bare 0.000.
+- Case study (README and docs/case-study/): three packs, two backends,
+  540 scored generations on an M5 Max; NVIDIA path verified live on an
+  RTX 5070 (predicted-versus-measured deltas published).
+
 ## 0.1.0 (2026-07-16)
 
 First release.
