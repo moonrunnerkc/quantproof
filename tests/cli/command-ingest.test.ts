@@ -147,6 +147,7 @@ describe('ingestCommand', () => {
       adapter,
       probeOptions: {
         nvidiaBinary: join(root, 'no-such-nvidia-smi'),
+        nvidiaDevicePaths: [],
         unified: { platform: 'linux' },
         system: { meminfoPath: meminfo },
       },

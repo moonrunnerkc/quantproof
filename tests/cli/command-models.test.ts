@@ -99,6 +99,7 @@ describe('modelsCommand on a CPU-only box', () => {
       adapter: fakeAdapter(),
       probeOptions: {
         nvidiaBinary: join(dir, 'no-such-nvidia-smi'),
+        nvidiaDevicePaths: [],
         unified: { platform: 'linux' },
         system: { meminfoPath: meminfo, osRelease: '6.17.0-test' },
       },

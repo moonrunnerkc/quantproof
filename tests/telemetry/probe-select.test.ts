@@ -87,6 +87,7 @@ describe('selectMemoryProbes', () => {
   it('reports no telemetry with the reason when no source works', async () => {
     const set = selectMemoryProbes('ollama', {
       nvidiaBinary: missingNvidia,
+      nvidiaDevicePaths: [],
       unified: { ...unified, platform: 'linux' },
       system: missingSystem,
     });
