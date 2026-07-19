@@ -77,17 +77,42 @@ local model whose fit verdict is "fits" at the drafting context).
 
 ## 4. CUDA determinism: the nondet flag earns its keep
 
-Seeded temperature-0 repetitions are NOT byte-identical on this
-CUDA stack (ollama 0.15.2, driver 590.48.01): llama3.1 (both quants)
-and gemma3:4b each produced differing outputs across repetitions of
-identical requests, flagged nondet in every report surface; gemma3:1b
-was byte-identical throughout. Observed concretely: one example
-answered "As needed" on rep 1 and "Weekly" on reps 2 and 3. On the Mac
-the same check passed on every candidate (Metal, 240+ units). This is
-the exact backend property methodology.md warns about, and the reason
-the check runs every time instead of being trusted once. Note the
-backend here is older (0.15.2); whether current Ollama behaves better
-on CUDA is unmeasured until this box is upgraded.
+Seeded temperature-0 repetitions are NOT byte-identical on this CUDA
+stack, and which models repeat exactly changes with the backend
+version. Same pack, same seed, same driver (590.48.01), measured on
+both Ollama versions the box has run:
+
+| candidate                 | ollama 0.15.2 | ollama 0.32.1 |
+|---------------------------|---------------|---------------|
+| llama3.1:latest           | nondet        | deterministic |
+| llama3.1:8b-instruct-q4_0 | nondet        | deterministic |
+| gemma3:4b                 | nondet        | nondet        |
+| gemma3:1b                 | deterministic | nondet        |
+
+Observed concretely on 0.15.2: one example answered "As needed" on
+rep 1 and "Weekly" on reps 2 and 3. On the Mac the same check passed
+on every candidate (Metal, 240+ units). This is the exact backend
+property methodology.md warns about, and the reason the check runs on
+every sweep instead of being trusted once: not even the direction of
+the effect survives a backend upgrade.
+
+## 5. Backend upgrade re-verification (ollama 0.32.1)
+
+After upgrading 0.15.2 to 0.32.1 (a 17-minor-version jump onto the
+rewritten runtime) the identical sweep completed **264/264 units, 0
+failed** with no code changes: pull-on-demand fetched three models the
+new service store lacked, and the bundle again re-scored 264/264 with
+0 mismatches. Version-sensitive observations, every one labeled with
+its backend version by the tool:
+
+- The two 8B quants swapped places: Q4_0 led on 0.15.2 (0.576 vs
+  0.515), Q4_K_M leads on 0.32.1 (0.591 vs 0.545). On a 22-example
+  pack that gap is a few examples wide; treat same-family quant
+  orderings this close as within noise.
+- TTFT roughly doubled across the board (llama3.1 ~140 ms to ~233 ms,
+  gemma3 ~260 ms to ~500 ms) while tokens/sec moved a few percent
+  either way; peaks landed slightly lower (deltas -8.7% to -26.0% vs
+  prediction, gemma3:1b again the conservative outlier).
 
 ## Verdict
 

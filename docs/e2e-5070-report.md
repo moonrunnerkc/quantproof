@@ -1,12 +1,12 @@
 # quantproof: recurring-tasks-classification on NVIDIA GeForce RTX 5070
 
-Measured results of running the recurring-tasks-classification task pack against 4 local models via ollama 0.15.2. Scores are deterministic (scorer: exact-label); no numbers below are estimates unless labeled as predictions.
+Measured results of running the recurring-tasks-classification task pack against 4 local models via ollama 0.32.1. Scores are deterministic (scorer: exact-label); no numbers below are estimates unless labeled as predictions.
 
 ## Environment
 
 - Date: 2026-07-19
 - GPU: NVIDIA GeForce RTX 5070, driver 590.48.01
-- Backend: ollama 0.15.2
+- Backend: ollama 0.32.1
 - Task pack: recurring-tasks-classification (scorer exact-label), fingerprint `7b7a2b622291`
 - **Drafted pack**: pack drafted by llama3.1:latest (ollama 0.15.2) from recurring-tasks.md on 2026-07-19; expected values are model-authored and unreviewed, so quality measures agreement with the drafter (set provenance.reviewed in task.yaml after checking)
 - Generation: context 4096, max_tokens 512, temperature 0, seed 42, 3 runs per example
@@ -22,32 +22,30 @@ Measured results of running the recurring-tasks-classification task pack against
 
 | model | quant | quality (spread) | pass | TTFT ms (spread) | tok/s (spread) | peak memory MiB | predicted MiB (delta) | flags |
 | --- | --- | --- | ---: | --- | --- | ---: | --- | --- |
-| llama3.1:latest | Q4_K_M | 0.515 (0.500..0.545) | 51.5% | 142 (127..187) | 97.7 (84.0..112.3) | 5774 | 6229 (-7.3%) | [a] |
-| llama3.1:8b-instruct-q4_0 | Q4_0 | 0.576 (0.545..0.591) | 57.6% | 138 (127..161) | 108.6 (97.0..133.3) | 5472 | 5981 (-8.5%) | [b] |
-| gemma3:4b | Q4_K_M | 0.439 (0.409..0.455) | 43.9% | 261 (251..324) | 142.0 (95.2..165.7) | 4231 | 4752 (-11.0%) | [c] |
-| gemma3:1b | Q4_K_M | 0.182 | 18.2% | 259 (244..294) | 268.7 (174.1..323.4) | 1479 | 1906 (-22.4%) |  |
+| llama3.1:latest | Q4_K_M | 0.591 | 59.1% | 233 (222..311) | 108.9 (89.9..115.0) | 5588 | 6229 (-10.3%) |  |
+| llama3.1:8b-instruct-q4_0 | Q4_0 | 0.545 | 54.5% | 234 (225..283) | 112.9 (101.0..122.9) | 5459 | 5981 (-8.7%) |  |
+| gemma3:4b | Q4_K_M | 0.455 | 45.5% | 508 (484..591) | 119.7 (84.0..132.0) | 4189 | 4752 (-11.9%) | [a] |
+| gemma3:1b | Q4_K_M | 0.212 (0.182..0.227) | 21.2% | 480 (467..556) | 203.9 (106.4..232.6) | 1411 | 1906 (-26.0%) | [b] |
 
-- [a] llama3.1:latest: outputs differed across repetitions; the backend did not produce repeatable output for identical requests
-- [b] llama3.1:8b-instruct-q4_0: outputs differed across repetitions; the backend did not produce repeatable output for identical requests
-- [c] gemma3:4b: outputs differed across repetitions; the backend did not produce repeatable output for identical requests
+- [a] gemma3:4b: outputs differed across repetitions; the backend did not produce repeatable output for identical requests
+- [b] gemma3:1b: outputs differed across repetitions; the backend did not produce repeatable output for identical requests
 
 ## Pareto frontier
 
 Non-dominated on quality, peak memory, and median tokens/sec, among gate-passing candidates:
 
-- **llama3.1:8b-instruct-q4_0**: quality 0.576, 5472 MiB, 108.6 tok/s
-- **gemma3:4b**: quality 0.439, 4231 MiB, 142.0 tok/s
-- **gemma3:1b**: quality 0.182, 1479 MiB, 268.7 tok/s
-
-Dominated: llama3.1:latest.
+- **llama3.1:latest**: quality 0.591, 5588 MiB, 108.9 tok/s
+- **llama3.1:8b-instruct-q4_0**: quality 0.545, 5459 MiB, 112.9 tok/s
+- **gemma3:4b**: quality 0.455, 4189 MiB, 119.7 tok/s
+- **gemma3:1b**: quality 0.212, 1411 MiB, 203.9 tok/s
 
 ## Recommendation
 
-**llama3.1:8b-instruct-q4_0**. llama3.1:8b-instruct-q4_0 has the best measured quality (0.576) and the smallest footprint (5472 MiB peak memory) among the candidates within the quality tolerance.
+**llama3.1:latest**. llama3.1:latest has the best measured quality (0.591) and the smallest footprint (5588 MiB peak memory) among the candidates within the quality tolerance.
 
-- llama3.1:latest: quality 0.515 is 10.5% below the best 0.576, outside the tolerance
-- gemma3:4b: quality 0.439 is 23.7% below the best 0.576, outside the tolerance
-- gemma3:1b: quality 0.182 is 68.4% below the best 0.576, outside the tolerance
+- llama3.1:8b-instruct-q4_0: quality 0.545 is 7.7% below the best 0.591, outside the tolerance
+- gemma3:4b: quality 0.455 is 23.1% below the best 0.591, outside the tolerance
+- gemma3:1b: quality 0.212 is 64.1% below the best 0.591, outside the tolerance
 
 ## Methodology
 

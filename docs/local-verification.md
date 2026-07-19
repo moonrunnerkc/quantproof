@@ -67,9 +67,15 @@ Full detail in
    surface. 264/264 units completed; the bundle re-scored identically
    from its own contents.
 3. **CUDA determinism finding:** seeded temperature-0 repetitions are
-   not byte-identical on this stack (ollama 0.15.2, driver 590.48.01)
-   for llama3.1 and gemma3:4b; gemma3:1b held. The nondet flag caught
-   and labeled it in every surface, which is the designed behavior.
+   not byte-identical on this GPU, and which models repeat exactly
+   flipped between ollama 0.15.2 and 0.32.1 (llama3.1 went from nondet
+   to deterministic, gemma3:1b the reverse). The nondet flag caught
+   and labeled every case, which is the designed behavior and the
+   reason the check runs per sweep.
+4. **Backend upgrade compatibility:** the identical sweep ran clean on
+   ollama 0.32.1 with no code changes (264/264 units, pull-on-demand,
+   bundle re-scored exactly), so the adapter survives a 17-minor-
+   version backend jump.
 
 ## Not needed anywhere
 

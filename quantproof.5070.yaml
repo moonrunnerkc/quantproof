@@ -1,4 +1,7 @@
 backend: ollama
 candidates:
+  - llama3.1:latest
+  - llama3.1:8b-instruct-q4_0
   - gemma3:4b
-use_local_models: true
+  - gemma3:1b
+use_local_models: false
