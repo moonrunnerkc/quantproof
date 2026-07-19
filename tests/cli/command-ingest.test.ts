@@ -32,7 +32,7 @@ function validDraft(): string {
     type: 'classification',
     scorer: 'exact-label',
     scorer_params: { labels: ['sale', 'challenge', 'listing'] },
-    prompt: 'Classify the request into one bare label.\n\nRequest:\n{{input}}',
+    prompt: 'Classify the request as sale, challenge, or listing; answer with that one bare label.\n\nRequest:\n{{input}}',
     examples: Array.from({ length: 12 }, (_, i) => ({
       input: `request ${String(i)}`,
       expected: ['sale', 'challenge', 'listing'][i % 3],

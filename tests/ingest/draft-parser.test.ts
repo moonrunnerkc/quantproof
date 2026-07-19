@@ -9,7 +9,7 @@ function labelDraft(overrides: Record<string, unknown> = {}): Record<string, unk
     type: 'classification',
     scorer: 'exact-label',
     scorer_params: { labels: ['billing', 'bug'] },
-    prompt: 'Classify the ticket. Respond with one label.\n\nTicket:\n{{input}}',
+    prompt: 'Classify the ticket. Respond with exactly one of: billing, bug.\n\nTicket:\n{{input}}',
     examples: Array.from({ length: 12 }, (_, i) => ({
       input: `ticket number ${String(i)}`,
       expected: i % 2 === 0 ? 'billing' : 'bug',
@@ -59,6 +59,21 @@ describe('parseDraft', () => {
   it('rejects an unknown scorer with the valid list', () => {
     const errors = errorsFor(labelDraft({ scorer: 'vibes' }));
     expect(errors.some((e) => e.includes('exact-label, field-f1'))).toBe(true);
+  });
+
+  it('requires the prompt to name every declared label for exact-label', () => {
+    const errors = errorsFor(
+      labelDraft({ prompt: 'Classify the ticket. Respond with one label.\n\nTicket:\n{{input}}' }),
+    );
+    expect(errors.some((e) => e.includes('missing from the prompt') && e.includes('"billing"') && e.includes('"bug"'))).toBe(true);
+  });
+
+  it('accepts labels named in the prompt regardless of case', () => {
+    const parsed = parseDraft(
+      JSON.stringify(labelDraft({ prompt: 'Answer Billing or Bug, nothing else.\n\n{{input}}' })),
+      SCORERS,
+    );
+    expect(parsed.ok).toBe(true);
   });
 
   it('rejects expected labels outside the declared set, naming them', () => {

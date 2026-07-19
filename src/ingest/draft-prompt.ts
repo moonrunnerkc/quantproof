@@ -12,7 +12,7 @@ export const SOURCE_CHAR_BUDGET = 24000;
 /** Fewest examples a draft must propose to be worth validating. */
 export const MIN_DRAFT_EXAMPLES = 10;
 
-const SCORER_GUIDE = `- "exact-label": classification into a closed label set. scorer_params: {"labels": [...], "aliases": {...}} (aliases optional). Each example's "expected" is one label.
+const SCORER_GUIDE = `- "exact-label": classification into a closed label set. scorer_params: {"labels": [...], "aliases": {...}} (aliases optional). Each example's "expected" is one label. The prompt must list every label verbatim and demand exactly one of them as the entire answer.
 - "field-f1": extraction of named fields. scorer_params: {"key_fields": [...]}. Each "expected" is an object with those fields.
 - "numeric-tolerance": a single numeric answer. scorer_params: {"tolerance": <absolute number>}. Each "expected" is a number.
 - "pattern": output must contain declared substrings. scorer_params: {"patterns": [...]}. "expected" is unused but must be present (use the matched string).

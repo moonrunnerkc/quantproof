@@ -81,6 +81,7 @@ function checkScorerFit(
   scorer: string,
   params: Readonly<Record<string, unknown>>,
   examples: readonly DraftExample[],
+  prompt: string | null,
 ): void {
   if (scorer === 'exact-label') {
     const labels = params['labels'];
@@ -95,6 +96,18 @@ function checkScorerFit(
       errors.push(
         `every expected value must be one of the declared labels; not in the set: ${[...new Set(offenders)].slice(0, 5).join(', ')}`,
       );
+    }
+    // A prompt that never shows the label set leaves the model free to
+    // invent its own categories, and exact-label then scores everything
+    // zero; a live run surfaced exactly that, so the check is here.
+    if (prompt !== null) {
+      const lowered = prompt.toLowerCase();
+      const missing = labels.filter((label) => !lowered.includes(label.toLowerCase()));
+      if (missing.length > 0) {
+        errors.push(
+          `the prompt must name every declared label so the model answers from the set (and demand exactly one label as the whole answer); missing from the prompt: ${missing.map((l) => JSON.stringify(l)).join(', ')}`,
+        );
+      }
     }
   }
   if (scorer === 'field-f1') {
@@ -179,7 +192,7 @@ export function parseDraft(output: string, knownScorers: readonly string[]): Dra
   }
   const examples = checkExamples(errors, raw['examples']);
   if (typeof scorer === 'string' && knownScorers.includes(scorer)) {
-    checkScorerFit(errors, scorer, params, examples);
+    checkScorerFit(errors, scorer, params, examples, typeof prompt === 'string' ? prompt : null);
   }
   if (
     errors.length > 0 ||
