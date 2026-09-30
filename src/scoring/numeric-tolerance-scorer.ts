@@ -63,7 +63,7 @@ export function numericToleranceScorer(
     };
   }
 
-  const allowed = mode === 'absolute' ? tolerance : tolerance * Math.abs(expected);
+  const allowed = tolerance;
   const difference = Math.abs(parsed.value - expected);
   const pass = difference <= allowed;
 
